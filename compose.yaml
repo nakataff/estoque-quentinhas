@@ -1,0 +1,14 @@
+services:
+  estoque:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_PASSWORD: ${APP_PASSWORD:?Defina APP_PASSWORD no arquivo .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      DATABASE_PATH: /data/estoque.sqlite3
+    volumes:
+      - estoque_data:/data
+volumes:
+  estoque_data:
