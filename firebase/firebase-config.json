@@ -4,5 +4,6 @@
   "projectId": "estoque-quentinhas",
   "storageBucket": "estoque-quentinhas.firebasestorage.app",
   "messagingSenderId": "1075801963840",
-  "appId": "1:1075801963840:web:b23daf92aabdb667878ea5"
+  "appId": "1:1075801963840:web:b23daf92aabdb667878ea5",
+  "databaseURL": "https://estoque-quentinhas-default-rtdb.firebaseio.com"
 }
