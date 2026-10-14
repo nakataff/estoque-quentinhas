@@ -165,7 +165,7 @@ class StockApp:
             with self.connect() as db:
                 db.execute('SELECT 1').fetchone()
             return {'ok': True}, 'application/json', []
-        static = {'/':'index.html','/app.js':'app.js','/style.css':'style.css','/icon.svg':'icon.svg','/manifest.webmanifest':'manifest.webmanifest'}
+        static = {'/':'index.html','/app.js':'app.js','/style.css':'style.css','/icon.svg':'icon.svg','/manifest.webmanifest':'manifest.webmanifest','/config.js':'config.js','/cloud.js':'cloud.js','/stock-engine.js':'stock-engine.js'}
         if path in static:
             if method != 'GET':
                 raise ApiError('Método não permitido.', 405)

@@ -1,0 +1,45 @@
+name: Publicar no GitHub Pages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preparar configuração pública do Firebase
+        env:
+          FIREBASE_CONFIG: ${{ vars.FIREBASE_CONFIG }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          raw = os.environ.get('FIREBASE_CONFIG', '').strip()
+          if not raw:
+              raise SystemExit('Configure FIREBASE_CONFIG nas variáveis do repositório antes de publicar.')
+          config = json.loads(raw)
+          if 'private_key' in config or config.get('type') == 'service_account':
+              raise SystemExit('Use a configuração pública do aplicativo WEB, nunca uma conta de serviço.')
+          if not all(config.get(k) for k in ['apiKey','databaseURL','projectId']):
+              raise SystemExit('A configuração precisa de apiKey, databaseURL e projectId.')
+          Path('static/config.js').write_text('window.STOCK_CONFIG = ' + json.dumps({'provider':'firebase','firebaseConfig':config}) + ';\n')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: static
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4

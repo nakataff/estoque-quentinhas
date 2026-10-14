@@ -1,0 +1,66 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "members": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+    "kitchen": {
+      ".read": "auth != null && root.child('members').child(auth.uid).val() === true",
+      ".write": "auth != null && root.child('members').child(auth.uid).val() === true && newData.exists()",
+      ".validate": "newData.hasChildren(['nextProductId','nextMovementId'])",
+      "nextProductId": {
+        ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 === 0"
+      },
+      "nextMovementId": {
+        ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 === 0"
+      },
+      "products": {
+        "$id": {
+          ".validate": "newData.hasChildren(['id','name','category','unit','quantity','minimum','archived','created_at'])",
+          "id": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 === 0"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80"
+          },
+          "category": {
+            ".validate": "newData.val() === 'Ingredientes' || newData.val() === 'Embalagens' || newData.val() === 'Quentinhas prontas' || newData.val() === 'Outros'"
+          },
+          "unit": {
+            ".validate": "newData.val() === 'kg' || newData.val() === 'g' || newData.val() === 'L' || newData.val() === 'mL' || newData.val() === 'un' || newData.val() === 'pacote'"
+          },
+          "quantity": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000 && newData.val() % 1 === 0"
+          },
+          "minimum": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000 && newData.val() % 1 === 0"
+          },
+          "archived": {
+            ".validate": "newData.val() === 0 || newData.val() === 1"
+          },
+          "created_at": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "movements": {
+        "$id": {
+          ".validate": "newData.hasChildren([\"id\", \"product_id\", \"name\", \"unit\", \"delta\", \"balance\", \"note\", \"created_at\", \"request_id\", \"reversal_of\"]) && (!data.exists() || (newData.child('id').val() === data.child('id').val() && newData.child('product_id').val() === data.child('product_id').val() && newData.child('name').val() === data.child('name').val() && newData.child('unit').val() === data.child('unit').val() && newData.child('delta').val() === data.child('delta').val() && newData.child('balance').val() === data.child('balance').val() && newData.child('note').val() === data.child('note').val() && newData.child('created_at').val() === data.child('created_at').val() && newData.child('request_id').val() === data.child('request_id').val() && newData.child('reversal_of').val() === data.child('reversal_of').val()))"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "$other": {
+      ".validate": false
+    }
+  }
+}

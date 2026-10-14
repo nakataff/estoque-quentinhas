@@ -1,5 +1,59 @@
 # Estoque da Cozinha
 
+Painel simples de estoque para celulares, tablets e computadores.
+
+## Opção principal: GitHub Pages + Firebase separado
+
+O frontend está preparado para GitHub Pages, com Firebase Authentication e Realtime Database em um projeto exclusivo deste estoque. Nenhum projeto do Central Free Fire é utilizado.
+
+**Situação atual:** código e workflow prontos; Firebase ainda não provisionado e GitHub Pages ainda não publicado. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
+
+### Criar o Firebase
+
+1. Abra https://console.firebase.google.com/ e crie um projeto novo, por exemplo `estoque-quentinhas`. Analytics não é necessário para o painel.
+2. Cadastre um aplicativo **Web** nas configurações do projeto. Guarde o objeto público `firebaseConfig`.
+3. Crie um **Realtime Database** em modo bloqueado. Copie a `databaseURL` dele para o objeto `firebaseConfig`; esta URL não é do Firestore.
+4. Em **Authentication**, habilite **E-mail/senha** e crie uma conta para acessar o estoque. Você pode criar contas separadas para familiares: todos os usuários autorizados veem o mesmo estoque.
+5. Em Realtime Database > Regras, publique o conteúdo de `firebase/database.rules.json`.
+6. Copie o UID de cada conta em Authentication > Users. Na aba Dados do Realtime Database, crie `members`, adicione uma chave com esse UID e valor booleano `true`. Somente essas contas conseguem ler e escrever o estoque. Nunca deixe as regras abertas.
+7. Em Authentication > Settings > Authorized domains, adicione `nakataff.github.io`.
+
+Use somente a configuração pública do app Web. Não coloque senha, chave privada ou credenciais de conta de serviço no repositório. Um exemplo está em `firebase/firebase-config.example.json`.
+
+### Conectar ao GitHub Pages
+
+1. No repositório, abra Settings > Secrets and variables > Actions > **Variables**.
+2. Crie a variável `FIREBASE_CONFIG` com o JSON público do app Web, incluindo `apiKey`, `projectId` e `databaseURL`.
+3. Abra Settings > Pages e selecione **GitHub Actions** como fonte de publicação.
+4. Abra Actions > **Publicar no GitHub Pages** > Run workflow.
+5. Após o workflow concluir, use o link publicado no ambiente `github-pages`.
+
+O workflow publica apenas a pasta `static`, gera a configuração a partir da variável e falha com uma mensagem clara se ela estiver incompleta. Publicações são manuais: após uma alteração no código ou na configuração, execute o workflow novamente.
+
+GitHub Pages de repositórios privados depende do plano da conta. Se a página de configuração exigir upgrade, você pode optar por tornar o repositório público ou usar Firebase Hosting. O código público não dá acesso aos dados: o banco exige login e autorização por UID. A mudança de visibilidade não é feita automaticamente.
+
+### Como funciona a sincronização
+
+O Firebase é o único banco da versão Pages. A tela consulta o estoque a cada 10 segundos e ao voltar para a página. Cada gravação usa a versão do banco (ETag / If-Match): caso outro aparelho altere o saldo, a operação lê o estoque atualizado e tenta novamente. Reenvios usam o mesmo código da movimentação para evitar duplicação.
+
+As sessões do Firebase ficam no navegador, com renovação do token. O botão **Sair** remove a sessão daquele aparelho. O código de acesso nunca é embutido no HTML; cada pessoa entra com e-mail e senha. Contas autorizadas têm permissão para administrar o estoque da família.
+
+Esta versão lê e grava o estoque inteiro de forma atômica. É adequada para uma pequena cozinha; um histórico muito grande aumenta o tráfego. Consulte os limites do plano contratado e faça backups periódicos exportando o JSON pelo console do Realtime Database. O CSV serve para consulta e não restaura sozinho todo o banco.
+
+As operações de estoque são testadas localmente e a concorrência HTTP é simulada. A integração real com Firebase e as regras precisam ser verificadas após conectar um projeto. Nenhuma afirmação de publicação ou banco ativo é feita antes disso.
+
+### Testes
+
+```bash
+node --test tests/stock-engine.test.cjs tests/cloud.test.cjs
+node --check static/app.js
+node --check static/cloud.js
+```
+
+---
+
+# Versão Python / SQLite
+
 Painel em português para administrar ingredientes, embalagens e quentinhas prontas. Layout adaptado a celulares, tablets e computadores, com botões grandes e foco no uso diário.
 
 ## O que já funciona
