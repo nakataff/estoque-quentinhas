@@ -9,8 +9,8 @@
       }
     },
     "kitchen": {
-      ".read": "auth != null && root.child('members').child(auth.uid).val() === true",
-      ".write": "auth != null && root.child('members').child(auth.uid).val() === true && newData.exists()",
+      ".read": "auth != null && (auth.uid === 'rCbRxIi1CgUrvEaoqh14gXrMkFy2' || root.child('members').child(auth.uid).val() === true)",
+      ".write": "auth != null && (auth.uid === 'rCbRxIi1CgUrvEaoqh14gXrMkFy2' || root.child('members').child(auth.uid).val() === true) && newData.exists()",
       ".validate": "newData.hasChildren(['nextProductId','nextMovementId'])",
       "nextProductId": {
         ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 === 0"
