@@ -27,9 +27,7 @@ jobs:
           import json, os
           from pathlib import Path
           raw = os.environ.get('FIREBASE_CONFIG', '').strip()
-          if not raw:
-              raise SystemExit('Configure FIREBASE_CONFIG nas variáveis do repositório antes de publicar.')
-          config = json.loads(raw)
+          config = json.loads(raw) if raw else json.loads(Path('firebase/firebase-config.json').read_text())
           if 'private_key' in config or config.get('type') == 'service_account':
               raise SystemExit('Use a configuração pública do aplicativo WEB, nunca uma conta de serviço.')
           if not all(config.get(k) for k in ['apiKey','databaseURL','projectId']):

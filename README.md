@@ -6,7 +6,7 @@ Painel de estoque da Quentinha da Guerreira, com identidade em preto e vermelho,
 
 O frontend está preparado para GitHub Pages, com Firebase Authentication e Realtime Database em um projeto exclusivo deste estoque. Nenhum projeto do Central Free Fire é utilizado.
 
-**Situação atual:** código e workflow prontos; Firebase ainda não provisionado e GitHub Pages ainda não publicado. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
+**Situação atual:** código e workflow prontos; app Web do projeto Firebase `estoque-quentinhas` registrado; Realtime Database, autenticação e GitHub Pages ainda precisam ser configurados. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
 
 ### Criar o Firebase
 
@@ -23,12 +23,12 @@ Use somente a configuração pública do app Web. Não coloque senha, chave priv
 ### Conectar ao GitHub Pages
 
 1. No repositório, abra Settings > Secrets and variables > Actions > **Variables**.
-2. Crie a variável `FIREBASE_CONFIG` com o JSON público do app Web, incluindo `apiKey`, `projectId` e `databaseURL`.
+2. A configuração pública está em `firebase/firebase-config.json`. Depois de criar o banco, adicione a `databaseURL` a esse arquivo. Opcionalmente, a variável `FIREBASE_CONFIG` com o JSON completo pode substituir o arquivo.
 3. Abra Settings > Pages e selecione **GitHub Actions** como fonte de publicação.
 4. Abra Actions > **Publicar no GitHub Pages** > Run workflow.
 5. Após o workflow concluir, use o link publicado no ambiente `github-pages`.
 
-O workflow publica apenas a pasta `static`, gera a configuração a partir da variável e falha com uma mensagem clara se ela estiver incompleta. Publicações são manuais: após uma alteração no código ou na configuração, execute o workflow novamente.
+O workflow publica apenas a pasta `static`, gera a configuração a partir do arquivo público ou da variável e falha com uma mensagem clara se ela estiver incompleta. Publicações são manuais: após uma alteração no código ou na configuração, execute o workflow novamente.
 
 GitHub Pages de repositórios privados depende do plano da conta. Se a página de configuração exigir upgrade, você pode optar por tornar o repositório público ou usar Firebase Hosting. O código público não dá acesso aos dados: o banco exige login e autorização por UID. A mudança de visibilidade não é feita automaticamente.
 
