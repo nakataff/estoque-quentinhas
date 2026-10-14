@@ -1,5 +1,12 @@
 name: Publicar no GitHub Pages
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'static/**'
+      - 'firebase/**'
+      - 'tests/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +26,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar funções antes de publicar
+        run: |
+          node --check static/app.js
+          node --check static/cloud.js
+          node --test tests/*.test.cjs
       - name: Preparar configuração pública do Firebase
         env:
           FIREBASE_CONFIG: ${{ vars.FIREBASE_CONFIG }}

@@ -14,4 +14,4 @@ jobs:
           node-version: '22'
       - run: node --check static/app.js
       - run: node --check static/cloud.js
-      - run: node --test tests/stock-engine.test.cjs tests/cloud.test.cjs
+      - run: node --test tests/*.test.cjs

@@ -2,11 +2,27 @@
 
 Painel de estoque da Quentinha da Guerreira, com identidade em preto e vermelho, adaptado a celulares, tablets e computadores.
 
+## Compras, receitas e edições
+
+- **Produtos:** estoque mínimo, estoque ideal, marca preferida e alternativa, preço estimado por unidade de medida, fornecedor e validade mais próxima. Sem ideal definido, a lista sugere manter duas vezes o mínimo.
+- **Lista de compras:** adicionar produtos manualmente, ajustar quantidade, marca, fornecedor e orçamento; copiar a lista completa para o WhatsApp.
+- **Compra recebida:** quantidade recebida, preço pago por kg/unidade/etc., data, marca e fornecedor. O total é calculado em centavos. Confirmar dá entrada no estoque e registra o gasto; uma compra parcial mantém o restante planejado na lista.
+- **Compras e gastos:** semana, mês, todo o período ou datas escolhidas; valor pago, diferença para valores previstos e custo estimado de descartes. Compras estornadas não entram nos totais. Exportação CSV de compras.
+- **Validade:** alerta para datas vencidas ou nos próximos três dias, e filtro no estoque. É uma data de referência por produto, **não um controle de lotes**. Informe a menor data e ajuste quando aquela embalagem/lote acabar. Uma nova entrada preserva a menor validade conhecida enquanto ainda houver saldo.
+- **Perdas:** saídas podem ser identificadas como vencimento, dano ou descarte. O custo da perda usa o preço do produto e fica separado do total de compras.
+- **Receitas:** informe produto final em `un`, rendimento, ingredientes e embalagens, cada um na sua própria unidade. O custo inclui ingredientes e embalagens; não inclui mão de obra, gás, entrega ou margem. Preços ausentes tornam o custo parcial.
+- **Produção:** confere ingredientes, dá baixa em todos e registra a entrada de quentinhas numa única gravação. Consumos proporcionais são arredondados para cima na precisão de 0,001 da unidade. Se a receita mudou em outro aparelho depois de abrir a conferência, a produção é recusada até revisar.
+- **Categorias personalizadas:** ficam disponíveis no cadastro e nos filtros.
+- **Desfazer/refazer edições:** funciona em edições de produtos, listas, categorias e receitas. O histórico é compartilhado entre aparelhos. A operação compara o estado atual antes de reverter e recusa sobrescrever mudanças posteriores. Uma nova edição descarta a pilha de refazer. Criação/arquivamento de produto e movimentações não entram nessa pilha; as movimentações têm estorno próprio no Histórico.
+- **Estorno de produção:** devolve todos os ingredientes e retira as quentinhas juntas. Se o saldo de quentinhas não permitir a reversão, o sistema recusa o estorno. Não é permitido estornar só um ingrediente da produção.
+
+Os novos dados são registrados como eventos adicionais no histórico do mesmo banco. O formato básico de produtos e movimentos é preservado, assim como as regras já publicadas. A atualização não apaga ou reinicializa o estoque existente. Esta ampliação está disponível na versão **Firebase / GitHub Pages**; a versão Python abaixo conserva o controle básico.
+
 ## Opção principal: GitHub Pages + Firebase separado
 
 O frontend está preparado para GitHub Pages, com Firebase Authentication e Realtime Database em um projeto exclusivo deste estoque. Nenhum projeto do Central Free Fire é utilizado.
 
-**Situação atual:** código e workflow prontos; app Web, endereço do Realtime Database e UID de acesso registrados. Falta publicar as regras no Firebase, habilitar GitHub Pages e verificar o banco real. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
+**Situação atual:** código e workflow prontos; app Web, endereço do Realtime Database e UID de acesso registrados. GitHub Pages configurado e a primeira publicação concluída; as regras e os usuários do Firebase são administrados pelo proprietário. O frontend é publicado automaticamente após mudanças no repositório e testes aprovados. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
 
 ### Criar o Firebase
 
@@ -28,7 +44,7 @@ Use somente a configuração pública do app Web. Não coloque senha, chave priv
 4. Abra Actions > **Publicar no GitHub Pages** > Run workflow.
 5. Após o workflow concluir, use o link publicado no ambiente `github-pages`.
 
-O workflow publica apenas a pasta `static`, gera a configuração a partir do arquivo público ou da variável e falha com uma mensagem clara se ela estiver incompleta. Publicações são manuais: após uma alteração no código ou na configuração, execute o workflow novamente.
+O workflow publica apenas a pasta `static`, gera a configuração a partir do arquivo público ou da variável e falha com uma mensagem clara se ela estiver incompleta. Mudanças no código, testes ou configuração pública disparam a publicação automaticamente. O botão Run workflow continua disponível para publicar novamente.
 
 GitHub Pages de repositórios privados depende do plano da conta. Se a página de configuração exigir upgrade, você pode optar por tornar o repositório público ou usar Firebase Hosting. O código público não dá acesso aos dados: o banco exige login e autorização por UID. A mudança de visibilidade não é feita automaticamente.
 
@@ -45,7 +61,7 @@ As operações de estoque são testadas localmente e a concorrência HTTP é sim
 ### Testes
 
 ```bash
-node --test tests/stock-engine.test.cjs tests/cloud.test.cjs
+node --test tests/*.test.cjs
 node --check static/app.js
 node --check static/cloud.js
 ```
