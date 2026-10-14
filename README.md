@@ -6,7 +6,7 @@ Painel de estoque da Quentinha da Guerreira, com identidade em preto e vermelho,
 
 O frontend está preparado para GitHub Pages, com Firebase Authentication e Realtime Database em um projeto exclusivo deste estoque. Nenhum projeto do Central Free Fire é utilizado.
 
-**Situação atual:** código e workflow prontos; app Web do projeto Firebase `estoque-quentinhas` registrado; Realtime Database, autenticação e GitHub Pages ainda precisam ser configurados. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
+**Situação atual:** código e workflow prontos; app Web, endereço do Realtime Database e UID de acesso registrados. Falta publicar as regras no Firebase, habilitar GitHub Pages e verificar o banco real. É necessário concluir a configuração abaixo. O endereço final será informado pelo próprio workflow após uma publicação bem-sucedida.
 
 ### Criar o Firebase
 
@@ -15,7 +15,7 @@ O frontend está preparado para GitHub Pages, com Firebase Authentication e Real
 3. Crie um **Realtime Database** em modo bloqueado. Copie a `databaseURL` dele para o objeto `firebaseConfig`; esta URL não é do Firestore.
 4. Em **Authentication**, habilite **E-mail/senha** e crie uma conta para acessar o estoque. Você pode criar contas separadas para familiares: todos os usuários autorizados veem o mesmo estoque.
 5. Em Realtime Database > Regras, publique o conteúdo de `firebase/database.rules.json`.
-6. Copie o UID de cada conta em Authentication > Users. Na aba Dados do Realtime Database, crie `members`, adicione uma chave com esse UID e valor booleano `true`. Somente essas contas conseguem ler e escrever o estoque. Nunca deixe as regras abertas.
+6. O UID inicial informado pelo proprietário já está autorizado no arquivo de regras. Para autorizar outras contas, copie seus UIDs em Authentication > Users e, na aba Dados do Realtime Database, crie `members/<UID>` com valor booleano `true`. Somente contas autorizadas conseguem ler e escrever o estoque.
 7. Em Authentication > Settings > Authorized domains, adicione `nakataff.github.io`.
 
 Use somente a configuração pública do app Web. Não coloque senha, chave privada ou credenciais de conta de serviço no repositório. Um exemplo está em `firebase/firebase-config.example.json`.
