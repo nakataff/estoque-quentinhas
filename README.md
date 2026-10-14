@@ -1,6 +1,6 @@
-# Estoque da Cozinha
+# Estoque - Quentinha da Guerreira
 
-Painel simples de estoque para celulares, tablets e computadores.
+Painel de estoque da Quentinha da Guerreira, com identidade em preto e vermelho, adaptado a celulares, tablets e computadores.
 
 ## Opção principal: GitHub Pages + Firebase separado
 
