@@ -5,7 +5,7 @@ Painel de estoque da Quentinha da Guerreira, com identidade em preto e vermelho,
 ## Compras, receitas e edições
 
 - **Produtos:** estoque mínimo, estoque ideal, marca preferida e alternativa, preço estimado por unidade de medida, fornecedor e validade mais próxima. Sem ideal definido, a lista sugere manter duas vezes o mínimo.
-- **Lista de compras:** adicionar produtos manualmente, ajustar quantidade, marca, fornecedor e orçamento; copiar a lista completa para o WhatsApp.
+- **Lista de compras:** criar itens avulsos diretamente na lista **sem cadastrar no estoque**, com nome, quantidade, unidade, marca, fornecedor, observação e preço opcional. Os itens avulsos podem ser editados, excluídos, marcados como comprados e reabertos em outra compra. A lista também mantém as sugestões de reposição dos produtos do estoque, calcula o orçamento e permite copiar tudo para o WhatsApp. Marcar um item avulso como comprado não altera o estoque nem registra uma despesa em Compras e gastos.
 - **Compra recebida:** quantidade recebida, preço pago por kg/unidade/etc., data, marca e fornecedor. O total é calculado em centavos. Confirmar dá entrada no estoque e registra o gasto; uma compra parcial mantém o restante planejado na lista.
 - **Compras e gastos:** semana, mês, todo o período ou datas escolhidas; valor pago, diferença para valores previstos e custo estimado de descartes. Compras estornadas não entram nos totais. Exportação CSV de compras.
 - **Validade:** alerta para datas vencidas ou nos próximos três dias, e filtro no estoque. É uma data de referência por produto, **não um controle de lotes**. Informe a menor data e ajuste quando aquela embalagem/lote acabar. Uma nova entrada preserva a menor validade conhecida enquanto ainda houver saldo.
