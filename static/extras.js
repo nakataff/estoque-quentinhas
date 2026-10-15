@@ -77,13 +77,22 @@ window.StockExtras=(()=>{
     if(!getLists().some(l=>l.id===selected))selected='default';
     const picker=$('#shopping-active-list');
     if(!picker)return;
-    picker.innerHTML=getLists().map(l=>'<option value="'+esc(l.id)+'"'+(l.id===selected?' selected':'')+'>'+esc(l.name)+'</option>').join('');
+    picker.innerHTML=getLists().map(l=>'<option value="'+esc(l.id)+'"'+(l.id===selected?' selected':'')+'>'+esc(l.name)+(l.archived?' (arquivada)':'')+'</option>').join('');
     $('#shopping-list-rename').hidden=selected==='default';
     $('#shopping-list-delete').hidden=selected==='default';
+    $('#shopping-list-clone').hidden=selected==='default';
+    $('#shopping-list-archive').hidden=selected==='default';
+    const archived=!!getLists().find(l=>l.id===selected)?.archived;
+    $('#shopping-list-archive').textContent=archived?'Reabrir lista':'Arquivar lista';
+    $('#add-manual-shopping').disabled=archived;
+    $('#add-shopping').disabled=archived;
+    $('#market-toggle').disabled=archived;
+    if(archived)market=false;
     $('#market-toggle').textContent=market?'Sair do modo mercado':'Abrir modo mercado';
     const items=filteredItems(state.shopping),completed=filteredItems(state.completedShopping||[]);
     $('#shopping-list').hidden=market;
     document.querySelectorAll('#shopping-list [data-list-id]').forEach(el=>el.hidden=el.dataset.listId!==selected);
+    document.querySelectorAll('#shopping-list button, #completed-shopping button').forEach(b=>b.disabled=archived);
     const placeholder=$('#shopping-current-empty');placeholder.hidden=market||items.length>0||!document.querySelector('#shopping-list .shopping-card');
     const doneSection=$('#completed-shopping-section');doneSection.hidden=market||completed.length===0;
     document.querySelectorAll('#completed-shopping [data-list-id]').forEach(el=>el.hidden=el.dataset.listId!==selected);
@@ -100,11 +109,11 @@ window.StockExtras=(()=>{
       card.querySelector('.minimum')?.after(hint);
     });
   }
-  function openList(id){
-    const f=$('#shopping-list-form');f.reset();f.dataset.requestId=rid();f.elements.id.value=id||'';
+  function openList(id,copyOf){
+    const f=$('#shopping-list-form');f.reset();f.dataset.requestId=rid();f.dataset.copyOf=copyOf||'';f.elements.id.value=id||'';
     const row=getLists().find(l=>l.id===id);
-    $('#shopping-list-title').textContent=row?'Renomear lista':'Nova lista';
-    f.elements.name.value=row?.name||'';
+    $('#shopping-list-title').textContent=copyOf?'Reutilizar itens':row?'Renomear lista':'Nova lista';
+    f.elements.name.value=copyOf?(listName(copyOf)+' (cópia)'):row?.name||'';
     $('.form-error',f).textContent='';$('#shopping-list-dialog').showModal();
   }
   function openUnit(id){
@@ -157,6 +166,13 @@ window.StockExtras=(()=>{
     const button=e.target.closest('button');if(!button||!state)return;
     if(button.id==='shopping-list-create')openList();
     if(button.id==='shopping-list-rename')openList(selected);
+    if(button.id==='shopping-list-clone')openList(null,selected);
+    if(button.id==='shopping-list-archive'){
+      const info=getLists().find(l=>l.id===selected);if(!info)return;
+      const archived=!info.archived;
+      if(archived&&!confirm('Arquivar "'+info.name+'"? Você poderá reabrir ou copiar os itens quando quiser.'))return;
+      send('/api/shopping_lists',{id:selected,archive:archived},null,archived?'Lista arquivada.':'Lista reaberta.');
+    }
     if(button.id==='shopping-list-delete'){
       if(selected==='default')return;
       if(!confirm('Excluir "'+listName(selected)+'"? A lista precisa estar vazia.'))return;
@@ -198,7 +214,7 @@ window.StockExtras=(()=>{
   $('#count-form').addEventListener('input',updateCountPreview);
   $('#shopping-list-form').addEventListener('submit',e=>{
     e.preventDefault();const f=e.currentTarget;
-    send('/api/shopping_lists',{...(f.elements.id.value?{id:f.elements.id.value}:{}),name:f.elements.name.value},f,'Lista salva.');
+    send('/api/shopping_lists',{...(f.elements.id.value?{id:f.elements.id.value}:{}),...(f.dataset.copyOf?{copy_of:f.dataset.copyOf}:{}),name:f.elements.name.value},f,'Lista salva.');
   });
   $('#unit-form').addEventListener('submit',e=>{
     e.preventDefault();const f=e.currentTarget;
