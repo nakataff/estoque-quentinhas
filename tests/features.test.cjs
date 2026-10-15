@@ -173,3 +173,15 @@ test('lista de mercado arquivada pode ser reutilizada sem alterar a anterior',()
   s=apply(s,'shopping_lists',{id,archive:false}).stock;
   assert.equal(E.snapshot(s).shoppingLists.find(l=>l.id===id).archived,false);
 });
+
+test('compra parcial depois do modo mercado desmarca a quantidade que ainda falta',()=>{
+  let s=create(null,{quantity:0,minimum:2}).stock;
+  s=apply(s,'shopping',{product_id:1,quantity:5,unit_price:'6.50'}).stock;
+  s=apply(s,'shopping_track',{product_id:1,collected:true,actual_unit_price:'7.25'}).stock;
+  s=purchase(s,{quantity:2,planned_quantity:5,unit_price:'7.25'}).stock;
+  const line=E.snapshot(s).shopping.find(i=>i.product_id===1);
+  assert.equal(line.quantity,3000);
+  assert.equal(line.collected,false);
+  assert.equal(line.actual_unit_price,-1);
+  assert.equal(E.snapshot(s).purchases[0].total,1450);
+});
