@@ -28,3 +28,52 @@ test('produção não pode ser estornada parcialmente nem depois de vender o sal
 test('produção recusa receita alterada depois da conferência',()=>{let {stock,recipe_id}=recipeStock();const revision=E.snapshot(stock).recipes[0].revision;stock=apply(stock,'recipes',{id:recipe_id,name:'Quentinha de arroz',output_id:3,yield:10,ingredients:[{product_id:1,quantity:2},{product_id:2,quantity:10}]}).stock;assert.throws(()=>apply(stock,'production',{recipe_id,recipe_revision:revision,portions:5}),/outro aparelho/);});
 test('preços faltantes tornam custo parcial e não aparecem como produto grátis',()=>{let {stock,recipe_id}=recipeStock();stock=apply(stock,'products',{id:1,name:'Arroz',category:'Ingredientes',unit:'kg',minimum:2,estimated_price:''}).stock;assert.equal(E.snapshot(stock).recipes[0].unknown,1);assert.equal(E.snapshot(stock).recipes[0].cost,1000);});
 test('histórico de gastos e perdas não depende do limite visual de 200 movimentos',()=>{let s=create(null,{quantity:1000}).stock;s=move(s,1,1,'out',{reason:'waste_other'}).stock;s=purchase(s).stock;for(let i=0;i<210;i++)s=move(s,1,1).stock;const result=E.snapshot(s);assert.equal(result.movements.length,200);assert.equal(result.purchases.length,1);assert.equal(result.losses.length,1);});
+
+test('lista avulsa aceita itens sem nenhum produto no estoque',()=>{
+  const result=apply(null,'manual_shopping',{name:'Detergente',unit:'un',quantity:3,unit_price:'4.50',brand:'Marca A',supplier:'Mercado',note:'Neutro'});
+  const snapshot=E.snapshot(result.stock);
+  assert.equal(snapshot.products.length,0);
+  assert.equal(snapshot.shopping.length,1);
+  assert.equal(snapshot.shopping[0].name,'Detergente');
+  assert.equal(snapshot.shopping[0].quantity,3000);
+  assert.equal(snapshot.shopping[0].estimate,1350);
+  assert.equal(snapshot.shopping[0].manual,true);
+  assert.equal(snapshot.shopping[0].note,'Neutro');
+  assert.equal(snapshot.movements.length,0);
+});
+test('item avulso pode ser editado, concluído e reaberto sem alterar estoque',()=>{
+  let s=create(null).stock;
+  const first=apply(s,'manual_shopping',{name:'Guardanapos',unit:'pacote',quantity:2,unit_price:''});
+  s=first.stock;
+  const id=first.result.id;
+  s=apply(s,'manual_shopping',{id,name:'Guardanapos grandes',unit:'pacote',quantity:4,unit_price:'8.00'}).stock;
+  assert.equal(E.snapshot(s).shopping.find(i=>i.id===id).estimate,3200);
+  s=apply(s,'manual_shopping',{id,status:'bought'}).stock;
+  assert.equal(E.snapshot(s).shopping.some(i=>i.id===id),false);
+  assert.equal(E.snapshot(s).completedShopping[0].name,'Guardanapos grandes');
+  assert.equal(E.snapshot(s).products[0].quantity,5000);
+  s=apply(s,'manual_shopping',{id,status:'pending'}).stock;
+  assert.equal(E.snapshot(s).completedShopping.length,0);
+  assert.equal(E.snapshot(s).shopping.find(i=>i.id===id).quantity,4000);
+});
+test('excluir e desfazer restaura apenas o item avulso',()=>{
+  let s=apply(null,'manual_shopping',{name:'Copos',unit:'un',quantity:100}).stock;
+  const id=E.snapshot(s).shopping[0].id;
+  s=apply(s,'manual_shopping',{id,remove:true}).stock;
+  assert.equal(E.snapshot(s).shopping.length,0);
+  const edit=latest(s);
+  s=apply(s,'undo_edit',{id:edit.id}).stock;
+  assert.equal(E.snapshot(s).shopping[0].name,'Copos');
+  s=apply(s,'redo_edit',{id:edit.id}).stock;
+  assert.equal(E.snapshot(s).shopping.length,0);
+});
+test('cadastro avulso valida dados, nomes repetidos e requisições duplicadas',()=>{
+  const request_id=key();
+  const first=apply(null,'manual_shopping',{name:'Saco de lixo',unit:'pacote',quantity:2,request_id});
+  assert.equal(apply(first.stock,'manual_shopping',{name:'Saco de lixo',unit:'pacote',quantity:2,request_id}).result.duplicate,true);
+  assert.equal(E.snapshot(first.stock).shopping.length,1);
+  assert.throws(()=>apply(first.stock,'manual_shopping',{name:'saco de lixo',unit:'un',quantity:1}),/já está na lista/);
+  assert.throws(()=>apply(null,'manual_shopping',{name:'Copos',unit:'inválida',quantity:1}),/unidade válida/);
+  assert.throws(()=>apply(null,'manual_shopping',{name:'Copos',unit:'un',quantity:0}),/quantidade maior/);
+  assert.throws(()=>apply(null,'manual_shopping',{name:'Copos',unit:'un',quantity:1,unit_price:'-5'}),/Preço inválido/);
+});
