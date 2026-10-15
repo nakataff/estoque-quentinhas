@@ -145,11 +145,28 @@
         if(!before)fail('Lista não encontrada.');
         if(Object.values(meta.shopping).some(s=>s?.list_id===id&&['pending','bought'].includes(s.status)))fail('Essa lista tem itens. Mova ou exclua os itens antes.');
         edit('shoppingLists',id,before,null,'Excluir lista '+before.name);
+      }else if(data.archive!==undefined){
+        if(!before)fail('Lista não encontrada.');
+        edit('shoppingLists',id,before,{...before,archived:!!data.archive},(data.archive?'Arquivar ':'Reabrir ')+before.name);
       }else{
         const name=txt(data.name,60);
         if(!name)fail('Informe o nome da lista.');
         if(Object.values(meta.shoppingLists).some(s=>s.id!==id&&s.name.toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')))fail('Já existe uma lista com esse nome.');
-        edit('shoppingLists',id,before,{id,name},'Lista: '+name);
+        if(data.copy_of){
+          const source=meta.shoppingLists[data.copy_of];
+          if(!source)fail('Lista de origem não encontrada.');
+          edit('shoppingLists',id,null,{id,name,archived:false},'Reutilizar lista '+name);
+          let counter=0;
+          for(const row of Object.values(meta.shopping)){
+            if(row?.list_id!==data.copy_of||!['pending','bought'].includes(row.status))continue;
+            const p=row.manual?null:stock.products['p'+row.product_id];
+            if(!row.manual&&(!p||p.archived))continue;
+            const newId='manual:'+key+'_'+(++counter);
+            if(counter>300)fail('Esta lista é grande demais para copiar.');
+            set('shopping',newId,{...row,id:newId,manual:true,product_id:0,name:row.manual?row.name:p.name,unit:row.manual?row.unit:p.unit,
+              list_id:id,status:'pending',collected:false,actual_unit_price:-1,bought_at:0},':clone:'+counter);
+          }
+        }else edit('shoppingLists',id,before,{id,name,archived:before?.archived||false},'Lista: '+name);
       }
       result.id=id;
     }else if(action==='shopping_track'){
