@@ -20,6 +20,17 @@ window.StockExtras=(()=>{
     const current=id||line?.list_id||selected;
     form.elements.list_id.innerHTML=lists.map(l=>'<option value="'+esc(l.id)+'"'+(l.id===current?' selected':'')+'>'+esc(l.name)+'</option>').join('');
   }
+  function preparePackages(data,form,product){
+    const label=$('#package-count-label');if(!label)return;
+    const size=product.package_size||0;
+    label.hidden=!size;
+    form.elements.package_count.value='';
+    form.dataset.packageSize=String(size);
+    if(size){
+      $('#package-buying-note').textContent='1 '+(product.package_label||'embalagem')+' contém '+qty(size)+' '+product.unit+'. A quantidade recebida será preenchida automaticamente.';
+      if(Number(form.elements.quantity.value)>0)form.elements.package_count.value=(Number(form.elements.quantity.value)*1000/size).toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+    }
+  }
   function totals(items){
     const estimated=items.filter(i=>i.estimate>=0).reduce((n,i)=>n+i.estimate,0);
     const checked=items.filter(i=>i.collected),actual=checked.filter(i=>i.actual_unit_price>=0);
@@ -154,6 +165,14 @@ window.StockExtras=(()=>{
     if(button.id==='market-toggle'||button.id==='market-close'){market=!market;render(state,actions);}
     if(button.dataset.unitChange)openUnit(Number(button.dataset.unitChange));
     if(button.dataset.stockCount)openCount(Number(button.dataset.stockCount));
+    if(button.dataset.manualTransfer){
+      const item=(state.completedShopping||[]).find(i=>i.id===button.dataset.manualTransfer);
+      if(!item)return;
+      const existing=state.products.find(p=>p.name.toLocaleLowerCase('pt-BR')===item.name.toLocaleLowerCase('pt-BR'));
+      if(existing&&existing.unit!==item.unit){actions.notify('Produto existente com outra unidade. Corrija a unidade antes de transferir.',true);return;}
+      const text='Adicionar '+qty(item.quantity)+' '+item.unit+' de '+item.name+' ao estoque? '+(existing?'A quantidade será somada ao produto existente.':'O produto será cadastrado automaticamente em Outros.')+' Esta operação não poderá ser repetida.';
+      if(confirm(text))send('/api/manual_to_stock',{id:item.id},null,'Compra transferida para o estoque.');
+    }
     if(button.dataset.marketEdit){
       const item=getItem(button.dataset.marketEdit);
       if(item){const native=document.querySelector(item.manual?'[data-manual-edit="'+CSS.escape(item.id)+'"]':'[data-shopping="'+item.product_id+'"]');if(native)native.click();}
@@ -165,6 +184,14 @@ window.StockExtras=(()=>{
     if(field.dataset.marketCheck!==undefined)track(field.dataset.marketCheck,{collected:field.checked});
     if(field.dataset.marketPrice!==undefined)track(field.dataset.marketPrice,{actual_unit_price:field.value});
     if(field.closest('#unit-form')&&field.name==='unit')updateUnitPreview();
+    if(field.name==='package_count'&&field.closest('#purchase-form')){
+      const f=field.closest('form'),size=Number(f.dataset.packageSize);
+      if(size>0&&field.value!==''){
+        const q=Number(field.value)*size/1000;
+        f.elements.quantity.value=Number(q.toFixed(3));
+        f.elements.quantity.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    }
   });
   $('#unit-form').addEventListener('input',e=>{if(e.target.name==='estimated_price')e.currentTarget.dataset.priceEdited='yes';updateUnitPreview();});
   $('#count-form').addEventListener('input',updateCountPreview);
@@ -180,5 +207,5 @@ window.StockExtras=(()=>{
     e.preventDefault();const f=e.currentTarget;
     send('/api/stock_count',{product_id:Number(f.elements.product_id.value),quantity:f.elements.quantity.value,note:f.elements.note.value},f,'Conferência de estoque registrada.');
   });
-  return {render,filteredItems,fillListFields};
+  return {render,filteredItems,fillListFields,preparePackages};
 })();
