@@ -28,6 +28,12 @@
     return out;
   }
   function normalizeProduct(p,meta){const prefs={...prefDefaults,...meta.prefs[p.id]};const cat=meta.categories[prefs.custom_category_id];return {...p,...prefs,category:cat?.name||p.category};}
+  // Manual shopping entries live in the existing event log, not in the product inventory.
+  function manualShopping(meta,status){
+    return Object.values(meta.shopping).filter(row=>row?.manual===true&&row.status===status)
+      .map(row=>({...row,available:0,minimum:0,ideal:0,estimate:lineCost(row.quantity,row.unit_price)}))
+      .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  }
   function shopping(stock,meta,products){const list=[];
     for(const p of products){const saved=meta.shopping[p.id];const need=p.quantity<=p.minimum;
       if(!need&&(!saved||saved.status!=='pending'))continue;
@@ -40,7 +46,7 @@
         supplier:current?.supplier??p.supplier,unit_price:current?.unit_price??p.estimated_price,manual:!!current,
         estimate:lineCost(current?.quantity??suggested,current?.unit_price??p.estimated_price)});
     }
-    return list;
+    return [...manualShopping(meta,'pending'),...list];
   }
   function recipePlan(recipe,products,portions){portions=whole(portions);const needs=recipe.ingredients.map(i=>{const p=products.find(p=>p.id===i.product_id);if(!p)fail('Um ingrediente da receita foi arquivado. Edite a receita.');const quantity=Math.ceil(i.quantity*portions/recipe.yield);return {product_id:p.id,name:p.name,unit:p.unit,quantity,available:p.quantity,cost:lineCost(quantity,p.estimated_price),enough:p.quantity>=quantity};});const unknown=needs.filter(i=>i.cost<0).length;return {needs,portions,total:needs.filter(i=>i.cost>=0).reduce((sum,i)=>sum+i.cost,0),unknown,enough:needs.every(i=>i.enough)};}
   function snapshot(stock,full=false){stock=stock||empty();const meta=projected(stock),all=Object.values(stock.movements||{}),reversed=new Set(all.filter(m=>m.reversal_of).map(m=>m.reversal_of));
@@ -48,7 +54,7 @@
     const purchases=all.filter(m=>m.purchase).map(m=>({...m.purchase,id:m.id,name:m.name,unit:m.unit,product_id:m.product_id,created_at:m.created_at,reversed:reversed.has(m.id)})).sort((a,b)=>b.id-a.id);
     const recipes=Object.values(meta.recipes).map(r=>{try{const plan=recipePlan(r,products,r.yield);return {...r,cost:plan.total,unknown:plan.unknown};}catch{return {...r,cost:0,unknown:1,unavailable:true};}}).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
     return {products,movements:all.filter(m=>!m.meta).sort((a,b)=>b.id-a.id).map(m=>({...m,reversed:reversed.has(m.id)})).slice(0,full?undefined:200),
-      purchases,losses:all.filter(m=>m.reason?.startsWith('waste')).map(m=>({...m,reversed:reversed.has(m.id)})),shopping:shopping(stock,meta,products),categories:Object.values(meta.categories),recipes,
+      purchases,losses:all.filter(m=>m.reason?.startsWith('waste')).map(m=>({...m,reversed:reversed.has(m.id)})),shopping:shopping(stock,meta,products),completedShopping:manualShopping(meta,'bought'),categories:Object.values(meta.categories),recipes,
       edits:Object.values(meta.edits).sort((a,b)=>b.last_at-a.last_at),server_time:Math.floor(Date.now()/1000)};
   }
   function apply(source,action,data,now=Math.floor(Date.now()/1000)){
@@ -90,6 +96,33 @@
       if(!key)fail('Código da edição inválido.');const p=product(data.product_id),q=amount(data.quantity);if(q===0&&data.status!=='dismissed')fail('Informe uma quantidade maior que zero.');
       const value={product_id:p.id,quantity:q,unit_price:money(data.unit_price),brand:txt(data.brand),alternative:txt(data.alternative),supplier:txt(data.supplier),status:data.status==='dismissed'?'dismissed':'pending'};
       edit('shopping',p.id,meta.shopping[p.id]||null,value,'Lista de compras: '+p.name);
+    }else if(action==='manual_shopping'){
+      if(!key)fail('Código da edição inválido.');
+      const id=data.id?txt(data.id,100):'manual:'+key;
+      if(!/^manual:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))fail('Identificador da lista inválido.');
+      const before=meta.shopping[id]||null;
+      if(data.remove||data.status==='bought'||data.status==='pending'&&data.id&&data.name===undefined){
+        if(!before?.manual)fail('Item da lista não encontrado.');
+        if(data.remove)edit('shopping',id,before,null,'Retirar '+before.name+' da lista');
+        else {
+          const status=data.status;
+          if(status===before.status)fail('O item já está nessa situação.');
+          edit('shopping',id,before,{...before,status,bought_at:status==='bought'?now:0},(status==='bought'?'Marcar comprado: ':'Reabrir na lista: ')+before.name);
+        }
+        result.id=id;
+      }else{
+        const name=txt(data.name,80);
+        if(!name)fail('Informe o nome do item.');
+        if(before&&!before.manual)fail('Item inválido.');
+        if(before?.status==='bought')fail('Reabra o item comprado antes de editá-lo.');
+        if(Object.values(meta.shopping).some(row=>row?.manual&&row.status==='pending'&&row.id!==id&&row.name.toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')))fail('Esse item já está na lista. Edite o existente.');
+        if(!UNITS.includes(data.unit))fail('Selecione uma unidade válida.');
+        const quantity=amount(data.quantity);
+        if(!quantity)fail('Informe uma quantidade maior que zero.');
+        const after={id,manual:true,product_id:0,name,unit:data.unit,quantity,unit_price:money(data.unit_price),
+          brand:txt(data.brand),alternative:txt(data.alternative),supplier:txt(data.supplier),note:txt(data.note,200),status:'pending',bought_at:0};
+        edit('shopping',id,before,after,(before?'Editar ':'Adicionar ')+name+' na lista');result.id=id;
+      }
     }else if(action==='archive'){
       const p=product(data.id);if(p.quantity)fail('Registre a saída do saldo antes de arquivar este produto.');
       if(Object.values(meta.recipes).some(r=>r.output_id===p.id||r.ingredients.some(i=>i.product_id===p.id)))fail('Este produto está em uma receita. Edite a receita antes de arquivar.');p.archived=1;if(key)event({type:'archive',product_id:p.id});
