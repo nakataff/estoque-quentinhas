@@ -137,13 +137,16 @@ test('compra avulsa transferida passa ao estoque uma única vez e pode registrar
   let s=apply(null,'manual_shopping',{name:'Detergente',quantity:2,unit:'un',unit_price:'5.00'}).stock;
   const id=E.snapshot(s).shopping[0].id;
   s=apply(s,'manual_shopping',{id,status:'bought'}).stock;
+  s=apply(s,'manual_shopping',{id,status:'pending'}).stock;
+  s=apply(s,'shopping_track',{id,actual_unit_price:'5.20'}).stock;
+  s=apply(s,'manual_shopping',{id,status:'bought'}).stock;
   const result=apply(s,'manual_to_stock',{id});
   s=result.stock;
   assert.equal(E.snapshot(s).products[0].name,'Detergente');
   assert.equal(E.snapshot(s).products[0].quantity,2000);
   assert.equal(E.snapshot(s).shopping.length,0);
   assert.equal(E.snapshot(s).completedShopping.length,0);
-  assert.equal(E.snapshot(s).purchases[0].total,1000);
+  assert.equal(E.snapshot(s).purchases[0].total,1040);
   assert.throws(()=>apply(s,'manual_to_stock',{id}),/precisa estar marcado/);
 });
 test('compra recebida com validade abre lote rastreável',()=>{
