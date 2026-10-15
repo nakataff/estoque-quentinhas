@@ -298,7 +298,7 @@
             if(incoming)prefs.expiry_date=p.quantity&&prefs.expiry_date?(incoming<prefs.expiry_date?incoming:prefs.expiry_date):incoming;
             set('products',p.id,{core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs},':prefs');
             const target=meta.shopping[p.id]||{};const planned=data.planned_quantity!==undefined?amount(data.planned_quantity):(target.quantity||n);const received=Math.max(0,planned-n);
-            set('shopping',p.id,{...target,product_id:p.id,quantity:received,status:received?'pending':'bought',brand:extra.purchase.brand,supplier:extra.purchase.supplier,unit_price:paid},':shopping');
+            set('shopping',p.id,{...target,product_id:p.id,quantity:received,status:received?'pending':'bought',collected:false,actual_unit_price:-1,brand:extra.purchase.brand,supplier:extra.purchase.supplier,unit_price:paid},':shopping');
           }else{
             if(!['in','out'].includes(data.type))fail('Selecione entrada ou saída.');delta=data.type==='out'?-n:n;note=txt(data.note,200);
             const reasons=['use','sale','waste_expired','waste_damage','waste_other'];extra.reason=data.type==='out'?(reasons.includes(data.reason)?data.reason:'use'):'entry';
