@@ -14,7 +14,7 @@
   function expiry(v){v=txt(v,10);if(!v)return '';if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||Number.isNaN(Date.parse(v+'T12:00:00Z'))||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)fail('Data de validade inválida.');return v;}
   function whole(v,label='Quantidade de quentinhas'){const n=Number(v);if(!Number.isInteger(n)||n<=0||n>1000000)fail(label+' deve ser um número inteiro maior que zero.');return n;}
   function empty(){return {products:{},movements:{},nextProductId:1,nextMovementId:1};}
-  function projected(stock){const out={prefs:{},shopping:{},shoppingLists:{},categories:{},recipes:{},edits:{}};
+  function projected(stock){const out={prefs:{},shopping:{},shoppingLists:{},batches:{},categories:{},recipes:{},edits:{}};
     function set(entity,id,value){if(entity==='products'){out.prefs[id]=value?{...prefDefaults,...value.prefs}:{...prefDefaults};}else if(value===null)delete out[entity][id];else out[entity][id]=copy(value);}
     for(const m of Object.values(stock.movements||{}).sort((a,b)=>a.id-b.id)){
       const ev=m.meta;if(!ev)continue;
@@ -52,8 +52,11 @@
   function snapshot(stock,full=false){stock=stock||empty();const meta=projected(stock),all=Object.values(stock.movements||{}),reversed=new Set(all.filter(m=>m.reversal_of).map(m=>m.reversal_of));
     const products=Object.values(stock.products||{}).filter(p=>!p.archived).map(p=>normalizeProduct(p,meta)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
     const purchases=all.filter(m=>m.purchase).map(m=>({...m.purchase,id:m.id,name:m.name,unit:m.unit,product_id:m.product_id,created_at:m.created_at,reversed:reversed.has(m.id)})).sort((a,b)=>b.id-a.id);
+    const batches=Object.values(meta.batches).filter(b=>b.quantity>0).sort((a,b)=>a.expiry_date.localeCompare(b.expiry_date));
+    const analytics=products.map(p=>({product_id:p.id,consumed_30:all.filter(m=>!m.meta&&!reversed.has(m.id)&&m.product_id===p.id&&m.unit===p.unit&&m.delta<0&&['use','sale','production'].includes(m.reason)&&m.created_at>=Math.floor(Date.now()/1000)-2592000).reduce((sum,m)=>sum-m.delta,0)}));
+    for(const p of products){const dated=batches.filter(b=>b.product_id===p.id).map(b=>b.expiry_date);if(dated.length&&(!p.expiry_date||dated[0]<p.expiry_date))p.expiry_date=dated[0];}
     const recipes=Object.values(meta.recipes).map(r=>{try{const plan=recipePlan(r,products,r.yield);return {...r,cost:plan.total,unknown:plan.unknown};}catch{return {...r,cost:0,unknown:1,unavailable:true};}}).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-    return {products,shoppingLists:[{id:'default',name:'Lista principal'},...Object.values(meta.shoppingLists).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))],movements:all.filter(m=>!m.meta).sort((a,b)=>b.id-a.id).map(m=>({...m,reversed:reversed.has(m.id)})).slice(0,full?undefined:200),
+    return {products,batches,analytics,shoppingLists:[{id:'default',name:'Lista principal'},...Object.values(meta.shoppingLists).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))],movements:all.filter(m=>!m.meta).sort((a,b)=>b.id-a.id).map(m=>({...m,reversed:reversed.has(m.id)})).slice(0,full?undefined:200),
       purchases,losses:all.filter(m=>m.reason?.startsWith('waste')).map(m=>({...m,reversed:reversed.has(m.id)})),shopping:shopping(stock,meta,products),completedShopping:manualShopping(meta,'bought'),categories:Object.values(meta.categories),recipes,
       edits:Object.values(meta.edits).sort((a,b)=>b.last_at-a.last_at),server_time:Math.floor(Date.now()/1000)};
   }
@@ -67,7 +70,12 @@
     const event=(ev,suffix='')=>log(null,0,'Configuração do painel',key?(key+suffix):('edit-'+stock.nextMovementId),{meta:ev});
     function edit(entity,id,before,after,label){event({type:'edit',id:key||('edit-'+stock.nextMovementId),entity,entity_id:id,before,after,label});}
     function set(entity,id,value,suffix=''){event({type:'set',entity,entity_id:id,value},suffix);}
-    function change(p,delta,note,request_id,extra={}){if(p.quantity+delta<0)fail('Não há estoque suficiente para essa saída. Confira a quantidade.');if(p.quantity+delta>1000000000)fail('O saldo ultrapassa o limite permitido.');p.quantity+=delta;return log(p,delta,note,request_id,extra);}
+    function change(p,delta,note,request_id,extra={}){if(p.quantity+delta<0)fail('Não há estoque suficiente para essa saída. Confira a quantidade.');if(p.quantity+delta>1000000000)fail('O saldo ultrapassa o limite permitido.');if(delta<0){
+        let remaining=-delta;
+        const lots=Object.values(meta.batches).filter(b=>b.product_id===p.id&&b.quantity>0).sort((a,b)=>a.expiry_date.localeCompare(b.expiry_date));
+        for(const b of lots){if(remaining<=0)break;const used=Math.min(remaining,b.quantity);set('batches',b.id,{...b,quantity:b.quantity-used},':lot:'+b.id);remaining-=used;}
+      }
+      p.quantity+=delta;return log(p,delta,note,request_id,extra);}
     function productEditState(p){return {core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs:getPrefs(p.id)};}
     let result={ok:true};
     if(action==='products'){
@@ -164,6 +172,38 @@
       if(data.actual_unit_price!==undefined)value.actual_unit_price=money(data.actual_unit_price);
       edit('shopping',id,original,value,'Conferência: '+(isManual?original.name:product(Number(id)).name));
       result.id=id;
+    }else if(action==='batches'){
+      if(!key)fail('Código do lote inválido.');
+      const id=data.id?txt(data.id,100):'batch:'+key,before=meta.batches[id]||null;
+      if(!/^batch:[a-zA-Z0-9_-]{1,93}$/.test(id))fail('Identificador do lote inválido.');
+      if(data.remove){
+        if(!before)fail('Lote não encontrado.');
+        edit('batches',id,before,null,'Remover lote');
+      }else{
+        const p=product(Number(data.product_id)),quantity=amount(data.quantity),expires=expiry(data.expiry_date);
+        if(!quantity||!expires)fail('Informe quantidade e validade do lote.');
+        if(before&&before.product_id!==p.id)fail('Não é possível trocar o produto do lote.');
+        const allocated=Object.values(meta.batches).filter(b=>b.product_id===p.id&&b.id!==id).reduce((s,b)=>s+b.quantity,0);
+        if(allocated+quantity>p.quantity)fail('A quantidade dos lotes não pode superar o estoque disponível.');
+        edit('batches',id,before,{id,product_id:p.id,name:p.name,unit:p.unit,quantity,expiry_date:expires,created_at:before?.created_at||now},'Lote de '+p.name);
+      }
+      result.id=id;
+    }else if(action==='manual_to_stock'){
+      if(!key)fail('Código da transferência inválido.');
+      const id=txt(data.id,100),item=meta.shopping[id];
+      if(!item?.manual||item.status!=='bought')fail('O item precisa estar marcado como comprado.');
+      let p=Object.values(stock.products).find(p=>!p.archived&&p.name.toLocaleLowerCase('pt-BR')===item.name.toLocaleLowerCase('pt-BR'));
+      if(p&&p.unit!==item.unit)fail('O produto do estoque tem unidade diferente. Ajuste a unidade primeiro.');
+      if(!p){
+        p={id:stock.nextProductId++,name:item.name,category:'Outros',unit:item.unit,quantity:0,minimum:0,archived:0,created_at:now};
+        stock.products['p'+p.id]=p;
+        const price=item.actual_unit_price>=0?item.actual_unit_price:item.unit_price;
+        set('products',p.id,{core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs:{...prefDefaults,brand:item.brand,alternative:item.alternative,supplier:item.supplier,estimated_price:price}},':prefs');
+      }
+      const price=item.actual_unit_price>=0?item.actual_unit_price:item.unit_price;
+      const purchase=price>=0?{quantity:item.quantity,unit_price:price,total:lineCost(item.quantity,price),estimated_unit_price:item.unit_price,estimated_total:lineCost(item.quantity,item.unit_price),brand:item.brand,supplier:item.supplier,date:new Date(now*1000).toISOString().slice(0,10)}:null;
+      result.id=change(p,item.quantity,'Compra avulsa transferida ao estoque',key,{reason:'purchase',...(purchase?{purchase}:{})});
+      set('shopping',id,{...item,status:'transferred',transferred_at:now,transferred_product_id:p.id},':transfer');
     }else if(action==='stock_count'){
       if(!key)fail('Código da conferência inválido.');
       const p=product(Number(data.product_id)),counted=amount(data.quantity),difference=counted-p.quantity;
@@ -183,6 +223,7 @@
       set('products',p.id,{core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs},':prefs');
       const planned=meta.shopping[p.id];
       if(planned)set('shopping',p.id,{...planned,quantity:convert(planned.quantity),unit_price:planned.unit_price<0?-1:Math.round(planned.unit_price/ratio),actual_unit_price:(planned.actual_unit_price??-1)<0?-1:Math.round(planned.actual_unit_price/ratio)},':shopping');
+      for(const b of Object.values(meta.batches))if(b.product_id===p.id)set('batches',b.id,{...b,unit:to,quantity:convert(b.quantity)},':batch:'+b.id);
       for(const recipe of Object.values(meta.recipes))if(recipe.ingredients.some(i=>i.product_id===p.id))set('recipes',recipe.id,{...recipe,revision:key,ingredients:recipe.ingredients.map(i=>i.product_id===p.id?{...i,quantity:convert(i.quantity)}:i)},':recipe:'+recipe.id);
       event({type:'unit_conversion',product_id:p.id,from,to,ratio,old_quantity:oldQuantity},':conversion');
       result.id=p.id;
@@ -235,7 +276,9 @@
             extra.purchase={quantity,unit_price:paid,total:lineCost(n,paid),estimated_unit_price:estimated,estimated_total:lineCost(n,estimated),brand:txt(data.brand),supplier:txt(data.supplier),date:expiry(data.purchase_date)||new Date(now*1000).toISOString().slice(0,10)};
             delta=n;note=txt(data.note,200)||'Compra recebida';extra.reason='purchase';
             const prefs=getPrefs(p.id);prefs.brand=extra.purchase.brand||prefs.brand;prefs.supplier=extra.purchase.supplier||prefs.supplier;prefs.estimated_price=paid;
-            const incoming=expiry(data.expiry_date);if(incoming)prefs.expiry_date=p.quantity&&prefs.expiry_date?(incoming<prefs.expiry_date?incoming:prefs.expiry_date):incoming;
+            const incoming=expiry(data.expiry_date);
+            if(incoming)set('batches','batch:'+key,{id:'batch:'+key,product_id:p.id,name:p.name,unit:p.unit,quantity:n,expiry_date:incoming,created_at:now},':lot');
+            if(incoming)prefs.expiry_date=p.quantity&&prefs.expiry_date?(incoming<prefs.expiry_date?incoming:prefs.expiry_date):incoming;
             set('products',p.id,{core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs},':prefs');
             const target=meta.shopping[p.id]||{};const planned=data.planned_quantity!==undefined?amount(data.planned_quantity):(target.quantity||n);const received=Math.max(0,planned-n);
             set('shopping',p.id,{...target,product_id:p.id,quantity:received,status:received?'pending':'bought',brand:extra.purchase.brand,supplier:extra.purchase.supplier,unit_price:paid},':shopping');
