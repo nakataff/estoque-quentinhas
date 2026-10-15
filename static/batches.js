@@ -7,7 +7,7 @@ window.BatchExtras=(()=>{
   function render(data,ctx){
     state=data;({api,refresh,notify}=ctx);
     const el=$('#batches-view');if(!el)return;
-    const today=new Date().toISOString().slice(0,10);
+    const now=new Date(),today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
     let html='';
     const byProduct=new Map();
     for(const b of data.batches||[]){if(!byProduct.has(b.product_id))byProduct.set(b.product_id,[]);byProduct.get(b.product_id).push(b);}
