@@ -32,6 +32,9 @@ jobs:
       - name: Verificar funções antes de publicar
         run: |
           node --check static/app.js
+          node --check static/stock-engine.js
+          node --check static/extras.js
+          node --check static/batches.js
           node --check static/cloud.js
           node --test tests/*.test.cjs
       - name: Preparar configuração pública do Firebase
