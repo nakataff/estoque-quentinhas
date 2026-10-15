@@ -84,7 +84,7 @@ window.StockExtras=(()=>{
     const items=filteredItems(state.shopping),completed=filteredItems(state.completedShopping||[]);
     $('#shopping-list').hidden=market;
     document.querySelectorAll('#shopping-list [data-list-id]').forEach(el=>el.hidden=el.dataset.listId!==selected);
-    const placeholder=$('#shopping-current-empty');placeholder.hidden=market||items.length>0;
+    const placeholder=$('#shopping-current-empty');placeholder.hidden=market||items.length>0||!document.querySelector('#shopping-list .shopping-card');
     const doneSection=$('#completed-shopping-section');doneSection.hidden=market||completed.length===0;
     document.querySelectorAll('#completed-shopping [data-list-id]').forEach(el=>el.hidden=el.dataset.listId!==selected);
     const t=totals(items);
