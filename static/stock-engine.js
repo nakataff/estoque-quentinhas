@@ -99,7 +99,7 @@
     }else if(action==='manual_shopping'){
       if(!key)fail('Código da edição inválido.');
       const id=data.id?txt(data.id,100):'manual:'+key;
-      if(!/^manual:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))fail('Identificador da lista inválido.');
+      if(!/^manual:[a-zA-Z0-9_-]{1,93}$/.test(id))fail('Identificador da lista inválido.');
       const before=meta.shopping[id]||null;
       if(data.remove||data.status==='bought'||data.status==='pending'&&data.id&&data.name===undefined){
         if(!before?.manual)fail('Item da lista não encontrado.');
