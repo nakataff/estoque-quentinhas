@@ -5,7 +5,7 @@
   const copy=v=>JSON.parse(JSON.stringify(v));
   const stable=v=>JSON.stringify(v,(_,value)=>value&&typeof value==='object'&&!Array.isArray(value)?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b))):value);
   const same=(a,b)=>stable(a)===stable(b);
-  const prefDefaults={ideal:0,brand:'',alternative:'',supplier:'',estimated_price:-1,expiry_date:'',custom_category_id:''};
+  const prefDefaults={ideal:0,brand:'',alternative:'',supplier:'',estimated_price:-1,expiry_date:'',custom_category_id:'',package_size:0,package_label:''};
   function decimal(value,places,label){const raw=String(value);if(!new RegExp('^\\d+(?:[.,]\\d{1,'+places+'})?$').test(raw))fail(label+' inválido.');const parts=raw.replace(',','.').split('.');const n=Number(parts[0])*10**places+Number((parts[1]||'').padEnd(places,'0'));if(!Number.isSafeInteger(n)||n>1000000*10**places)fail(label+' acima do limite.');return n;}
   const amount=v=>decimal(v,3,'Quantidade');
   const money=v=>v===''||v===null||v===undefined?-1:decimal(v,2,'Preço');
@@ -14,7 +14,7 @@
   function expiry(v){v=txt(v,10);if(!v)return '';if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||Number.isNaN(Date.parse(v+'T12:00:00Z'))||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)fail('Data de validade inválida.');return v;}
   function whole(v,label='Quantidade de quentinhas'){const n=Number(v);if(!Number.isInteger(n)||n<=0||n>1000000)fail(label+' deve ser um número inteiro maior que zero.');return n;}
   function empty(){return {products:{},movements:{},nextProductId:1,nextMovementId:1};}
-  function projected(stock){const out={prefs:{},shopping:{},categories:{},recipes:{},edits:{}};
+  function projected(stock){const out={prefs:{},shopping:{},shoppingLists:{},categories:{},recipes:{},edits:{}};
     function set(entity,id,value){if(entity==='products'){out.prefs[id]=value?{...prefDefaults,...value.prefs}:{...prefDefaults};}else if(value===null)delete out[entity][id];else out[entity][id]=copy(value);}
     for(const m of Object.values(stock.movements||{}).sort((a,b)=>a.id-b.id)){
       const ev=m.meta;if(!ev)continue;
@@ -41,7 +41,7 @@
       const target=p.ideal||p.minimum*2;
       const suggested=Math.max(0,target-p.quantity);
       const current=saved?.status==='pending'?saved:null;
-      list.push({product_id:p.id,name:p.name,unit:p.unit,available:p.quantity,minimum:p.minimum,ideal:target,
+      list.push({id:'stock:'+p.id,product_id:p.id,list_id:current?.list_id||'default',collected:!!current?.collected,actual_unit_price:current?.actual_unit_price??-1,name:p.name,unit:p.unit,available:p.quantity,minimum:p.minimum,ideal:target,
         quantity:current?.quantity??suggested,brand:current?.brand??p.brand,alternative:current?.alternative??p.alternative,
         supplier:current?.supplier??p.supplier,unit_price:current?.unit_price??p.estimated_price,manual:!!current,
         estimate:lineCost(current?.quantity??suggested,current?.unit_price??p.estimated_price)});
@@ -53,7 +53,7 @@
     const products=Object.values(stock.products||{}).filter(p=>!p.archived).map(p=>normalizeProduct(p,meta)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
     const purchases=all.filter(m=>m.purchase).map(m=>({...m.purchase,id:m.id,name:m.name,unit:m.unit,product_id:m.product_id,created_at:m.created_at,reversed:reversed.has(m.id)})).sort((a,b)=>b.id-a.id);
     const recipes=Object.values(meta.recipes).map(r=>{try{const plan=recipePlan(r,products,r.yield);return {...r,cost:plan.total,unknown:plan.unknown};}catch{return {...r,cost:0,unknown:1,unavailable:true};}}).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-    return {products,movements:all.filter(m=>!m.meta).sort((a,b)=>b.id-a.id).map(m=>({...m,reversed:reversed.has(m.id)})).slice(0,full?undefined:200),
+    return {products,shoppingLists:[{id:'default',name:'Lista principal'},...Object.values(meta.shoppingLists).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))],movements:all.filter(m=>!m.meta).sort((a,b)=>b.id-a.id).map(m=>({...m,reversed:reversed.has(m.id)})).slice(0,full?undefined:200),
       purchases,losses:all.filter(m=>m.reason?.startsWith('waste')).map(m=>({...m,reversed:reversed.has(m.id)})),shopping:shopping(stock,meta,products),completedShopping:manualShopping(meta,'bought'),categories:Object.values(meta.categories),recipes,
       edits:Object.values(meta.edits).sort((a,b)=>b.last_at-a.last_at),server_time:Math.floor(Date.now()/1000)};
   }
@@ -79,6 +79,8 @@
       if(data.id){p=product(data.id);before=productEditState(p);if(p.unit!==data.unit)fail('Para preservar o histórico, a unidade não pode ser alterada.');}
       else{p={id:stock.nextProductId++,name,category:custom?'Outros':data.category,unit:data.unit,quantity:amount(data.quantity??0),minimum,archived:0,created_at:now};stock.products['p'+p.id]=p;if(p.quantity)log(p,p.quantity,'Estoque inicial',(key||'initial-'+p.id)+':stock');}
       const prefs={...getPrefs(p.id)};
+      if(data.package_size!==undefined)prefs.package_size=amount(data.package_size||0);
+      if(data.package_label!==undefined)prefs.package_label=txt(data.package_label,60);
       if(data.ideal!==undefined){prefs.ideal=amount(data.ideal);if(prefs.ideal&&prefs.ideal<minimum)fail('O estoque ideal deve ser igual ou maior que o mínimo.');}
       for(const k of ['brand','alternative','supplier'])if(data[k]!==undefined)prefs[k]=txt(data[k]);
       if(data.estimated_price!==undefined)prefs.estimated_price=money(data.estimated_price);
@@ -94,7 +96,9 @@
       edit('categories',id,meta.categories[id]||null,{id,name},'Categoria '+name);result.id=id;
     }else if(action==='shopping'){
       if(!key)fail('Código da edição inválido.');const p=product(data.product_id),q=amount(data.quantity);if(q===0&&data.status!=='dismissed')fail('Informe uma quantidade maior que zero.');
-      const value={product_id:p.id,quantity:q,unit_price:money(data.unit_price),brand:txt(data.brand),alternative:txt(data.alternative),supplier:txt(data.supplier),status:data.status==='dismissed'?'dismissed':'pending'};
+      const list_id=txt(data.list_id||meta.shopping[p.id]?.list_id||'default',100);
+      if(list_id!=='default'&&!meta.shoppingLists[list_id])fail('Lista não encontrada.');
+      const value={product_id:p.id,quantity:q,unit_price:money(data.unit_price),brand:txt(data.brand),alternative:txt(data.alternative),supplier:txt(data.supplier),list_id,collected:!!meta.shopping[p.id]?.collected,actual_unit_price:meta.shopping[p.id]?.actual_unit_price??-1,status:data.status==='dismissed'?'dismissed':'pending'};
       edit('shopping',p.id,meta.shopping[p.id]||null,value,'Lista de compras: '+p.name);
     }else if(action==='manual_shopping'){
       if(!key)fail('Código da edição inválido.');
@@ -120,9 +124,68 @@
         const quantity=amount(data.quantity);
         if(!quantity)fail('Informe uma quantidade maior que zero.');
         const after={id,manual:true,product_id:0,name,unit:data.unit,quantity,unit_price:money(data.unit_price),
-          brand:txt(data.brand),alternative:txt(data.alternative),supplier:txt(data.supplier),note:txt(data.note,200),status:'pending',bought_at:0};
+          brand:txt(data.brand),alternative:txt(data.alternative),supplier:txt(data.supplier),note:txt(data.note,200),list_id:txt(data.list_id||before?.list_id||'default',100),collected:before?.collected||false,actual_unit_price:before?.actual_unit_price??-1,status:'pending',bought_at:0};
+        if(after.list_id!=='default'&&!meta.shoppingLists[after.list_id])fail('Lista não encontrada.');
         edit('shopping',id,before,after,(before?'Editar ':'Adicionar ')+name+' na lista');result.id=id;
       }
+    }else if(action==='shopping_lists'){
+      if(!key)fail('Código da edição inválido.');
+      const id=data.id?txt(data.id,100):'list:'+key;
+      if(!/^list:[a-zA-Z0-9_-]{1,95}$/.test(id))fail('Identificador da lista inválido.');
+      const before=meta.shoppingLists[id]||null;
+      if(data.remove){
+        if(!before)fail('Lista não encontrada.');
+        if(Object.values(meta.shopping).some(s=>s?.list_id===id&&['pending','bought'].includes(s.status)))fail('Essa lista tem itens. Mova ou exclua os itens antes.');
+        edit('shoppingLists',id,before,null,'Excluir lista '+before.name);
+      }else{
+        const name=txt(data.name,60);
+        if(!name)fail('Informe o nome da lista.');
+        if(Object.values(meta.shoppingLists).some(s=>s.id!==id&&s.name.toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')))fail('Já existe uma lista com esse nome.');
+        edit('shoppingLists',id,before,{id,name},'Lista: '+name);
+      }
+      result.id=id;
+    }else if(action==='shopping_track'){
+      if(!key)fail('Código da edição inválido.');
+      const id=data.id?txt(data.id,100):String(Number(data.product_id));
+      const isManual=id.startsWith('manual:');
+      const original=meta.shopping[id]||null;
+      let value;
+      if(isManual){if(!original?.manual||original.status!=='pending')fail('Item avulso não encontrado.');value={...original};}
+      else{
+        const p=product(Number(id)),pref=getPrefs(p.id),suggest=Math.max(0,(pref.ideal||p.minimum*2)-p.quantity);
+        value={...(original||{}),product_id:p.id,quantity:original?.quantity??suggest,unit_price:original?.unit_price??pref.estimated_price,brand:original?.brand??pref.brand,alternative:original?.alternative??pref.alternative,supplier:original?.supplier??pref.supplier,status:'pending',list_id:original?.list_id||'default'};
+      }
+      if(data.list_id!==undefined){
+        const list_id=txt(data.list_id,100);
+        if(list_id!=='default'&&!meta.shoppingLists[list_id])fail('Lista não encontrada.');
+        value.list_id=list_id;
+      }
+      if(data.collected!==undefined)value.collected=!!data.collected;
+      if(data.actual_unit_price!==undefined)value.actual_unit_price=money(data.actual_unit_price);
+      edit('shopping',id,original,value,'Conferência: '+(isManual?original.name:product(Number(id)).name));
+      result.id=id;
+    }else if(action==='stock_count'){
+      if(!key)fail('Código da conferência inválido.');
+      const p=product(Number(data.product_id)),counted=amount(data.quantity),difference=counted-p.quantity;
+      if(!difference)fail('A quantidade informada é igual ao saldo.');
+      result.id=change(p,difference,'Conferência física: '+txt(data.note,200),key,{reason:'inventory_count'});
+    }else if(action==='change_unit'){
+      if(!key)fail('Código da alteração inválido.');
+      const p=product(Number(data.product_id)),from=p.unit,to=txt(data.unit,20);
+      if(!UNITS.includes(to)||from===to)fail('Selecione uma unidade diferente.');
+      const equivalent={kg:{g:1000},g:{kg:0.001},L:{mL:1000},mL:{L:0.001}};
+      const automatic=equivalent[from]?.[to],ratio=automatic??Number(String(data.conversion_factor||'').replace(',','.'));
+      if(!Number.isFinite(ratio)||ratio<=0||ratio>1000000)fail('Informe quanto uma unidade antiga representa na unidade nova.');
+      const convert=q=>{const n=Math.round(q*ratio);if(!Number.isSafeInteger(n)||n<0||n>1000000000)fail('A conversão excedeu o limite de quantidade.');if(q&&n===0)fail('A nova unidade não oferece precisão suficiente.');return n;};
+      const oldQuantity=p.quantity,prefs=getPrefs(p.id),prevPrice=prefs.estimated_price;
+      p.quantity=convert(p.quantity);p.minimum=convert(p.minimum);p.unit=to;
+      prefs.ideal=convert(prefs.ideal);prefs.estimated_price=data.estimated_price!==undefined?money(data.estimated_price):(prevPrice<0?-1:Math.round(prevPrice/ratio));prefs.package_size=convert(prefs.package_size);
+      set('products',p.id,{core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs},':prefs');
+      const planned=meta.shopping[p.id];
+      if(planned)set('shopping',p.id,{...planned,quantity:convert(planned.quantity),unit_price:planned.unit_price<0?-1:Math.round(planned.unit_price/ratio),actual_unit_price:(planned.actual_unit_price??-1)<0?-1:Math.round(planned.actual_unit_price/ratio)},':shopping');
+      for(const recipe of Object.values(meta.recipes))if(recipe.ingredients.some(i=>i.product_id===p.id))set('recipes',recipe.id,{...recipe,revision:key,ingredients:recipe.ingredients.map(i=>i.product_id===p.id?{...i,quantity:convert(i.quantity)}:i)},':recipe:'+recipe.id);
+      event({type:'unit_conversion',product_id:p.id,from,to,ratio,old_quantity:oldQuantity},':conversion');
+      result.id=p.id;
     }else if(action==='archive'){
       const p=product(data.id);if(p.quantity)fail('Registre a saída do saldo antes de arquivar este produto.');
       if(Object.values(meta.recipes).some(r=>r.output_id===p.id||r.ingredients.some(i=>i.product_id===p.id)))fail('Este produto está em uma receita. Edite a receita antes de arquivar.');p.archived=1;if(key)event({type:'archive',product_id:p.id});
@@ -156,12 +219,12 @@
       if(action==='undo_production'){
         const group=Object.values(stock.movements).filter(m=>m.production_id===data.production_id&&!m.reversal_of);
         if(!group.length)fail('Produção não encontrada.');if(group.some(m=>Object.values(stock.movements).some(r=>r.reversal_of===m.id)))fail('Essa produção já foi desfeita.');
-        for(const m of group){const p=product(m.product_id);if(p.quantity-m.delta<0)fail('As quentinhas dessa produção já saíram do estoque. Não é possível desfazer.');}
+        for(const m of group){const p=product(m.product_id);if(m.unit!==p.unit)fail('A unidade mudou após a produção. Faça uma conferência de estoque.');if(p.quantity-m.delta<0)fail('As quentinhas dessa produção já saíram do estoque. Não é possível desfazer.');}
         for(const [index,m] of group.entries())change(product(m.product_id),-m.delta,'Estorno da produção',index?key+':'+index:key,{reversal_of:m.id,production_id:data.production_id,reason:'reversal'});
       }else{
         let p,delta,note,extra={};
         if(action==='undo'){
-          const m=stock.movements['m'+data.id];if(!m||m.meta)fail('Movimentação não encontrada.');if(m.production_id)fail('Desfaça a produção completa, não um ingrediente isolado.');if(m.reversal_of||Object.values(stock.movements).some(r=>r.reversal_of===m.id))fail('Essa movimentação já foi desfeita ou é um estorno.');
+          const m=stock.movements['m'+data.id];if(!m||m.meta)fail('Movimentação não encontrada.');if(m.production_id)fail('Desfaça a produção completa, não um ingrediente isolado.');if(m.unit!==product(m.product_id).unit)fail('Movimentação anterior à mudança de unidade. Faça uma conferência de estoque.');if(m.reversal_of||Object.values(stock.movements).some(r=>r.reversal_of===m.id))fail('Essa movimentação já foi desfeita ou é um estorno.');
           p=product(m.product_id);delta=-m.delta;note='Estorno da movimentação #'+m.id;extra={reversal_of:m.id,reason:'reversal'};
           if(m.purchase){const previous=meta.shopping[p.id]||null;set('shopping',p.id,{...(previous||{}),product_id:p.id,quantity:m.purchase.quantity,brand:m.purchase.brand,alternative:'',supplier:m.purchase.supplier,unit_price:m.purchase.estimated_unit_price,status:'pending'},':reopen');}
         }else{
