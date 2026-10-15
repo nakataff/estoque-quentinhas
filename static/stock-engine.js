@@ -201,7 +201,7 @@
         set('products',p.id,{core:{name:p.name,category:p.category,unit:p.unit,minimum:p.minimum},prefs:{...prefDefaults,brand:item.brand,alternative:item.alternative,supplier:item.supplier,estimated_price:price}},':prefs');
       }
       const price=item.actual_unit_price>=0?item.actual_unit_price:item.unit_price;
-      const purchase=price>=0?{quantity:item.quantity,unit_price:price,total:lineCost(item.quantity,price),estimated_unit_price:item.unit_price,estimated_total:lineCost(item.quantity,item.unit_price),brand:item.brand,supplier:item.supplier,date:new Date(now*1000).toISOString().slice(0,10)}:null;
+      const purchase=item.actual_unit_price>=0?{quantity:item.quantity,unit_price:item.actual_unit_price,total:lineCost(item.quantity,item.actual_unit_price),estimated_unit_price:item.unit_price,estimated_total:lineCost(item.quantity,item.unit_price),brand:item.brand,supplier:item.supplier,date:new Date(now*1000).toISOString().slice(0,10)}:null;
       result.id=change(p,item.quantity,'Compra avulsa transferida ao estoque',key,{reason:'purchase',...(purchase?{purchase}:{})});
       set('shopping',id,{...item,status:'transferred',transferred_at:now,transferred_product_id:p.id},':transfer');
     }else if(action==='stock_count'){
