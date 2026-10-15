@@ -156,3 +156,20 @@ test('compra recebida com validade abre lote rastreável',()=>{
   assert.equal(E.snapshot(s).batches[0].quantity,2000);
   assert.equal(E.snapshot(s).batches[0].expiry_date,'2026-12-15');
 });
+
+test('lista de mercado arquivada pode ser reutilizada sem alterar a anterior',()=>{
+  let s=create(null,{quantity:0,minimum:2}).stock;
+  s=apply(s,'shopping_lists',{name:'Compras da semana'}).stock;
+  const id=E.snapshot(s).shoppingLists.find(l=>l.name==='Compras da semana').id;
+  s=apply(s,'shopping',{product_id:1,quantity:3,unit_price:'6.50',list_id:id}).stock;
+  s=apply(s,'manual_shopping',{name:'Detergente',unit:'un',quantity:2,unit_price:'4.50',list_id:id}).stock;
+  s=apply(s,'shopping_lists',{id,archive:true}).stock;
+  assert.equal(E.snapshot(s).shoppingLists.find(l=>l.id===id).archived,true);
+  s=apply(s,'shopping_lists',{name:'Compras da semana (cópia)',copy_of:id}).stock;
+  const snap=E.snapshot(s),newList=snap.shoppingLists.find(l=>l.name==='Compras da semana (cópia)');
+  assert.equal(snap.shopping.filter(i=>i.list_id===newList.id).length,2);
+  assert.ok(snap.shopping.filter(i=>i.list_id===newList.id).every(i=>i.manual&&!i.collected));
+  assert.equal(snap.shopping.filter(i=>i.list_id===id).length,2);
+  s=apply(s,'shopping_lists',{id,archive:false}).stock;
+  assert.equal(E.snapshot(s).shoppingLists.find(l=>l.id===id).archived,false);
+});
