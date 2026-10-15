@@ -90,3 +90,15 @@
   .insights-stats{grid-template-columns:1fr}
   .insights-header,.insights-row{grid-template-columns:1.3fr 1fr 1fr;gap:8px;padding:12px 10px;font-size:11px}
 }
+
+/* Lotes com datas de validade e pequenas melhorias de usabilidade. */
+.batch-group{background:var(--panel);border:1px solid var(--line);padding:21px;border-radius:11px;margin:14px 0}
+.batch-group>h3{font-size:19px;margin:0 0 4px}
+.batch-group>p{font-size:12px;margin-bottom:14px}
+.batch-row{border-top:1px solid var(--line);padding:14px 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.batch-row strong{font-size:15px}
+.batch-row p{font-size:12px;margin-top:5px}
+.batch-buttons{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.batch-buttons .secondary{min-height:38px;padding:8px 12px;font-size:12px}
+.batch-buttons .text-button{font-size:12px}
+@media(max-width:500px){.batch-group{padding:16px}.batch-row{align-items:flex-start;flex-direction:column}.batch-buttons{width:100%}}
