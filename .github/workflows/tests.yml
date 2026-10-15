@@ -13,5 +13,8 @@ jobs:
         with:
           node-version: '22'
       - run: node --check static/app.js
+      - run: node --check static/stock-engine.js
+      - run: node --check static/extras.js
+      - run: node --check static/batches.js
       - run: node --check static/cloud.js
       - run: node --test tests/*.test.cjs
