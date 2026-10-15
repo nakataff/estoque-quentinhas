@@ -77,3 +77,79 @@ test('cadastro avulso valida dados, nomes repetidos e requisições duplicadas',
   assert.throws(()=>apply(null,'manual_shopping',{name:'Copos',unit:'un',quantity:0}),/quantidade maior/);
   assert.throws(()=>apply(null,'manual_shopping',{name:'Copos',unit:'un',quantity:1,unit_price:'-5'}),/Preço inválido/);
 });
+
+test('listas separadas aceitam itens próprios e edição de nomes',()=>{
+  let s=apply(null,'shopping_lists',{name:'Atacadão'}).stock;
+  const list=E.snapshot(s).shoppingLists.find(l=>l.name==='Atacadão');
+  s=apply(s,'manual_shopping',{name:'Sabão',unit:'un',quantity:2,list_id:list.id}).stock;
+  s=apply(s,'manual_shopping',{name:'Farinha',unit:'kg',quantity:1}).stock;
+  assert.equal(E.snapshot(s).shopping.filter(i=>i.list_id===list.id).length,1);
+  assert.equal(E.snapshot(s).shopping.filter(i=>i.list_id==='default').length,1);
+  assert.throws(()=>apply(s,'shopping_lists',{id:list.id,remove:true}),/tem itens/);
+  s=apply(s,'shopping_lists',{id:list.id,name:'Compras grandes'}).stock;
+  assert.equal(E.snapshot(s).shoppingLists.find(l=>l.id===list.id).name,'Compras grandes');
+});
+test('modo mercado marca itens de compra e guarda preços reais sem alterar estoque',()=>{
+  let s=create(null,{quantity:0,minimum:2}).stock;
+  s=apply(s,'shopping_track',{product_id:1,collected:true,actual_unit_price:'7.10'}).stock;
+  const row=E.snapshot(s).shopping.find(i=>i.product_id===1);
+  assert.equal(row.collected,true);assert.equal(row.actual_unit_price,710);
+  assert.equal(E.snapshot(s).products[0].quantity,0);
+  s=apply(s,'shopping_track',{product_id:1,collected:false,actual_unit_price:''}).stock;
+  assert.equal(E.snapshot(s).shopping[0].collected,false);
+  assert.equal(E.snapshot(s).shopping[0].actual_unit_price,-1);
+});
+test('corrige óleo kg para litro com fator explícito e converte saldos sem mexer no histórico anterior',()=>{
+  let s=create(null,{name:'Óleo',unit:'kg',quantity:5,minimum:2,ideal:10,estimated_price:'10.00'}).stock;
+  s=apply(s,'shopping',{product_id:1,quantity:3,unit_price:'12.00'}).stock;
+  s=apply(s,'change_unit',{product_id:1,unit:'L',conversion_factor:'1.1',estimated_price:'9.09'}).stock;
+  const snap=E.snapshot(s),p=snap.products[0],planned=snap.shopping[0];
+  assert.equal(p.unit,'L');assert.equal(p.quantity,5500);
+  assert.equal(p.minimum,2200);assert.equal(p.ideal,11000);
+  assert.equal(p.estimated_price,909);
+  assert.equal(planned.quantity,3300);
+  assert.equal(planned.unit_price,1091);
+  assert.equal(snap.movements[0].unit,'kg');
+  assert.throws(()=>apply(s,'undo',{id:1}),/anterior à mudança/);
+});
+test('conversões métricas e conferência de saldo registram ajuste',()=>{
+  let s=create(null,{name:'Água',unit:'L',quantity:3,minimum:1}).stock;
+  s=apply(s,'change_unit',{product_id:1,unit:'mL'}).stock;
+  assert.equal(E.snapshot(s).products[0].quantity,3000000);
+  s=apply(s,'stock_count',{product_id:1,quantity:'2600'}).stock;
+  assert.equal(E.snapshot(s).products[0].quantity,2600000);
+  assert.equal(E.snapshot(s).movements[0].reason,'inventory_count');
+});
+test('embalagens e lotes de validade são preservados e baixa usa vencimento próximo',()=>{
+  let s=create(null,{quantity:10,package_size:5,package_label:'Saco'}).stock;
+  assert.equal(E.snapshot(s).products[0].package_size,5000);
+  s=apply(s,'batches',{product_id:1,quantity:3,expiry_date:'2026-10-20'}).stock;
+  s=apply(s,'batches',{product_id:1,quantity:5,expiry_date:'2026-11-20'}).stock;
+  assert.equal(E.snapshot(s).batches.length,2);
+  assert.throws(()=>apply(s,'batches',{product_id:1,quantity:3,expiry_date:'2026-12-30'}),/não pode superar/);
+  s=move(s,1,4).stock;
+  const lots=E.snapshot(s).batches;
+  assert.equal(lots.length,1);
+  assert.equal(lots[0].expiry_date,'2026-11-20');
+  assert.equal(lots[0].quantity,4000);
+});
+test('compra avulsa transferida passa ao estoque uma única vez e pode registrar gasto',()=>{
+  let s=apply(null,'manual_shopping',{name:'Detergente',quantity:2,unit:'un',unit_price:'5.00'}).stock;
+  const id=E.snapshot(s).shopping[0].id;
+  s=apply(s,'manual_shopping',{id,status:'bought'}).stock;
+  const result=apply(s,'manual_to_stock',{id});
+  s=result.stock;
+  assert.equal(E.snapshot(s).products[0].name,'Detergente');
+  assert.equal(E.snapshot(s).products[0].quantity,2000);
+  assert.equal(E.snapshot(s).shopping.length,0);
+  assert.equal(E.snapshot(s).completedShopping.length,0);
+  assert.equal(E.snapshot(s).purchases[0].total,1000);
+  assert.throws(()=>apply(s,'manual_to_stock',{id}),/precisa estar marcado/);
+});
+test('compra recebida com validade abre lote rastreável',()=>{
+  let s=create(null,{quantity:1}).stock;
+  s=purchase(s,{quantity:2,expiry_date:'2026-12-15'}).stock;
+  assert.equal(E.snapshot(s).batches.length,1);
+  assert.equal(E.snapshot(s).batches[0].quantity,2000);
+  assert.equal(E.snapshot(s).batches[0].expiry_date,'2026-12-15');
+});
