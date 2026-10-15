@@ -39,6 +39,7 @@ window.StockExtras=(()=>{
   }
   function renderMarket(items){
     const box=$('#market-view');box.hidden=!market;if(!market)return;
+    if(document.activeElement?.hasAttribute('data-market-price'))return; // Preserve typing during 10-second cloud refreshes.
     const t=totals(items),count=items.length;
     let html='<div class="market-head"><div><p class="eyebrow">COMPRAS EM ANDAMENTO</p><h2>'+esc(listName(selected))+'</h2><p>'+t.checked.length+' de '+count+' itens no carrinho</p></div><button class="secondary" id="market-close">Voltar à lista</button></div>';
     html+='<div class="market-progress" role="progressbar" aria-label="Progresso da lista" aria-valuemin="0" aria-valuemax="'+count+'" aria-valuenow="'+t.checked.length+'"><span style="width:'+(count?Math.round(100*t.checked.length/count):0)+'%"></span></div>';
