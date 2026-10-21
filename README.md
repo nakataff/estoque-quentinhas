@@ -27,6 +27,18 @@ Painel de estoque da Quentinha da Guerreira, com identidade em preto e vermelho,
 
 Os novos dados são registrados como eventos adicionais no histórico do mesmo banco. O formato básico de produtos e movimentos é preservado, assim como as regras já publicadas. A atualização não apaga ou reinicializa o estoque existente. Esta ampliação está disponível na versão **Firebase / GitHub Pages**; a versão Python abaixo conserva o controle básico.
 
+## Contas a pagar (painel secundário)
+
+Abra **Contas a pagar** pelo atalho na página inicial do estoque ou diretamente por `contas-a-pagar.html` no endereço publicado do GitHub Pages. O painel usa **o mesmo login do estoque**, a mesma identidade visual e funciona no celular.
+
+Funcionalidades disponíveis: cadastro com três campos principais (nome, valor e vencimento); valor ainda desconhecido; categorias e fornecedores; contas únicas, fixas (semanais, quinzenais, mensais e anuais) e compras parceladas; alertas visuais de atraso; calendário; filtros; pagamento total ou parcial com data e forma de pagamento; estorno de pagamento; cancelamento de contas sem apagar o histórico; resumo mensal; relatórios por categoria; comparação com mês anterior; exportação CSV; cópia do resumo para WhatsApp; impressão/salvar PDF pelo navegador. Parcelas e vencimentos futuros são calculados automaticamente, sem criar centenas de lançamentos antecipados.
+
+**IMPORTANTE — habilitar acesso no Firebase:** a publicação no GitHub Pages atualiza os arquivos do site, **mas não publica automaticamente as regras do Realtime Database**. Antes de usar o novo painel, abra Firebase Console → Realtime Database → Regras e publique o conteúdo atualizado de `firebase/database.rules.json` desta versão. Preserve os UIDs autorizados do ambiente atual e revise a regra `members`. Sem esse passo, o painel mostrará aviso de permissão e não conseguirá salvar as contas. As contas ficam no ramo `/finance`, separado de `/kitchen`, com a mesma autorização por usuário e gravações concorrentes protegidas por ETag.
+
+O painel **não registra pagamentos no estoque automaticamente** e não soma compras do estoque aos totais de contas a pagar. Isso evita a contagem dupla de gastos. Ao cadastrar manualmente uma conta referente a uma compra de estoque, confira a origem antes de somá-la a um relatório geral. Os avisos de vencimento são apresentados **ao abrir o painel**, não são mensagens automáticas enviadas pelo WhatsApp. Comprovantes anexados, alertas externos e conciliação automática com compras do estoque ainda não foram implementados.
+
+Para desenvolvimento, execute `node --test tests/finance.test.cjs` e `node --check static/finance.js`.
+
 ## Opção principal: GitHub Pages + Firebase separado
 
 O frontend está preparado para GitHub Pages, com Firebase Authentication e Realtime Database em um projeto exclusivo deste estoque. Nenhum projeto do Central Free Fire é utilizado.

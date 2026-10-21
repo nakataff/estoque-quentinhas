@@ -36,6 +36,8 @@ jobs:
           node --check static/extras.js
           node --check static/batches.js
           node --check static/cloud.js
+          node --check static/finance-engine.js
+          node --check static/finance.js
           node --test tests/*.test.cjs
       - name: Preparar configuração pública do Firebase
         env:

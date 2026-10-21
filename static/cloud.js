@@ -16,5 +16,31 @@ window.CloudStock=(()=>{
   async function transaction(action,data){for(let attempt=0;attempt<8;attempt++){const read=await database({headers:{'X-Firebase-ETag':'true'}});const changed=StockEngine.apply(read.data,action,data);if(changed.result.duplicate)return changed.result;const write=await database({method:'PUT',headers:{'Content-Type':'application/json','if-match':read.response.headers.get('ETag')},body:JSON.stringify(changed.stock)});if(write.response.status!==412)return changed.result;}throw new Error('O estoque está recebendo outras alterações. Tente novamente.');}
   async function api(path,data){if(path==='/api/login'){await authenticate(data.email,data.password);try{await database();}catch(e){save(null);throw e;}return {csrf:'firebase'};}if(path==='/api/logout'){save(null);return {ok:true};}if(path==='/api/session'){await session();return {csrf:'firebase'};}if(path==='/api/stock')return StockEngine.snapshot((await database()).data);return transaction(path.replace('/api/',''),data||{});}
   async function exportCSV(kind){const result=StockEngine.snapshot((await database()).data,true),safe=v=>{const t=String(v??'');return /^[\s]*[=+@-]/.test(t)?"'"+t:t;},quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=kind==='purchases'?[['Data','Produto','Quantidade','Unidade','Marca','Fornecedor','Total previsto','Total pago','Situação'],...result.purchases.map(p=>[p.date,safe(p.name),p.quantity/1000,p.unit,safe(p.brand),safe(p.supplier),p.estimated_total>=0?p.estimated_total/100:'',p.total/100,p.reversed?'Estornada':'Recebida'])]:kind==='history'?[['Data UTC','Produto','Movimentação','Saldo','Unidade','Observação'],...result.movements.map(m=>[new Date(m.created_at*1000).toISOString(),safe(m.name),m.delta/1000,m.balance/1000,m.unit,safe(m.note)])]:[['Produto','Categoria','Quantidade','Unidade','Estoque mínimo'],...result.products.map(p=>[safe(p.name),p.category,p.quantity/1000,p.unit,p.minimum/1000])];return new Blob(['\ufeff'+rows.map(r=>r.map(quote).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});}
-  return {enabled,api,exportCSV};
+
+  // Contas a pagar ficam em /finance, fora dos dados e transações do estoque.
+  async function financeRequest(options={}){
+    const s=await session();
+    const url=firebase.databaseURL.replace(/[/]$/,'')+'/finance.json?auth='+encodeURIComponent(s.idToken);
+    const result=await http(url,options);
+    if(!result.response.ok&&result.response.status!==412){
+      const error=new Error(result.response.status===403?'Sem permissão para as contas. Publique as regras atualizadas do Firebase.':'Não foi possível sincronizar as contas. Confira sua conexão.');
+      error.status=result.response.status;throw error;
+    }
+    return result;
+  }
+  async function financeRead(){
+    if(!enabled)throw new Error('As contas a pagar estão disponíveis na versão Firebase / GitHub Pages.');
+    return FinanceEngine.clean((await financeRequest()).data);
+  }
+  async function financeTransaction(action){
+    if(!enabled)throw new Error('Use a versão Firebase para registrar contas.');
+    for(let attempt=0;attempt<8;attempt++){
+      const read=await financeRequest({headers:{'X-Firebase-ETag':'true'}});
+      const next=FinanceEngine.apply(read.data,action);
+      const write=await financeRequest({method:'PUT',headers:{'Content-Type':'application/json','if-match':read.response.headers.get('ETag')},body:JSON.stringify(next)});
+      if(write.response.status!==412)return next;
+    }
+    throw new Error('Outra pessoa alterou as contas ao mesmo tempo. Tente novamente.');
+  }
+  return {enabled,api,exportCSV,financeRead,financeTransaction};
 })();

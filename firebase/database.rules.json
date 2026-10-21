@@ -61,6 +61,29 @@
     },
     "$other": {
       ".validate": false
+    },
+    "finance": {
+      ".read": "auth != null && (auth.uid === 'rCbRxIi1CgUrvEaoqh14gXrMkFy2' || root.child('members').child(auth.uid).val() === true)",
+      ".write": "auth != null && (auth.uid === 'rCbRxIi1CgUrvEaoqh14gXrMkFy2' || root.child('members').child(auth.uid).val() === true) && newData.exists()",
+      ".validate": "newData.hasChild('bills') || newData.hasChild('templates') || newData.hasChild('payments')",
+      "bills": {
+        "$id": {
+          ".validate": "newData.hasChildren(['id','title','due','category']) && newData.child('id').isString() && newData.child('title').isString() && newData.child('title').val().length <= 100 && newData.child('due').isString() && newData.child('due').val().length === 10 && newData.child('category').isString() && (!newData.hasChild('amountCents') || (newData.child('amountCents').isNumber() && newData.child('amountCents').val() > 0 && newData.child('amountCents').val() <= 10000000000))"
+        }
+      },
+      "templates": {
+        "$id": {
+          ".validate": "newData.hasChildren(['id','title','firstDue','frequency','category']) && newData.child('id').isString() && newData.child('title').isString() && newData.child('title').val().length <= 100 && newData.child('firstDue').isString() && newData.child('firstDue').val().length === 10 && (newData.child('frequency').val() === 'monthly' || newData.child('frequency').val() === 'weekly' || newData.child('frequency').val() === 'biweekly' || newData.child('frequency').val() === 'yearly') && (!newData.hasChild('amountCents') || (newData.child('amountCents').isNumber() && newData.child('amountCents').val() > 0 && newData.child('amountCents').val() <= 10000000000))"
+        }
+      },
+      "payments": {
+        "$id": {
+          ".validate": "newData.hasChildren(['id','billId','amountCents','paidAt']) && newData.child('id').isString() && newData.child('billId').isString() && newData.child('paidAt').isString() && newData.child('paidAt').val().length === 10 && newData.child('amountCents').isNumber() && newData.child('amountCents').val() > 0 && newData.child('amountCents').val() <= 10000000000"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
     }
   }
 }

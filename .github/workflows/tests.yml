@@ -17,4 +17,6 @@ jobs:
       - run: node --check static/extras.js
       - run: node --check static/batches.js
       - run: node --check static/cloud.js
+      - run: node --check static/finance-engine.js
+      - run: node --check static/finance.js
       - run: node --test tests/*.test.cjs
