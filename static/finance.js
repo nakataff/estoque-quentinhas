@@ -24,6 +24,11 @@
   }
   const items=(offset=0)=>{const r=range(offset);return E.occurrences(data,r.from,r.to);};
   const status=b=>E.situation(data,b,today());
+  function historicalOverdue(){
+    const start=(new Date().getFullYear()-5)+'-01-01';
+    const yesterday=E.shiftDays(today(),-1);
+    return E.occurrences(data,start,yesterday).filter(b=>status(b).key==='overdue');
+  }
   const lookup=id=>items().find(b=>b.id===id)||data.bills[id]||null;
   function setSync(ok){
     const el=$('#finance-sync');el.textContent=ok?'Contas atualizadas':'Sem conexão';el.classList.toggle('offline',!ok);
@@ -66,16 +71,25 @@
     $('#finance-month-name').textContent=new Date(r.year,r.month,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
     $('#sum-remaining').textContent=E.asBRL(totals.remaining);
     $('#sum-paid').textContent=E.asBRL(totals.paid);
-    $('#sum-overdue').textContent=E.asBRL(totals.overdue);
+    const isThisMonth=(r.from.slice(0,7)===today().slice(0,7));
+    const allLate=isThisMonth?historicalOverdue():[];
+    $('#sum-overdue').textContent=E.asBRL(isThisMonth?allLate.reduce((s,b)=>s+(status(b).remaining||0),0):totals.overdue);
+    $('#sum-overdue-note').textContent=isThisMonth?'Inclui meses anteriores':'Neste mês';
     $('#sum-open').textContent=String(totals.open);
     $('#sum-unknown').textContent=totals.unknown?totals.unknown+' sem valor informado':'Aguardando pagamento';
     const percent=totals.total?Math.min(100,Math.round(totals.paid*100/totals.total)):0;
     $('#progress-label').textContent=percent+'% do valor quitado';
     $('#progress-fill').style.width=percent+'%';
-    const currentMonth=(r.from.slice(0,7)===today().slice(0,7));
-    const urgent=current.filter(b=>{const s=status(b);return s.key==='today'||s.key==='overdue';});
-    const alert=$('#finance-alerts');alert.hidden=!currentMonth||!urgent.length;
-    if(!alert.hidden)alert.innerHTML='<strong>⚠️ Atenção:</strong> '+urgent.length+' conta'+(urgent.length>1?'s':'')+' vencida'+(urgent.length>1?'s':'')+' ou vencendo hoje. <button type="button" id="go-urgent">Ver contas</button>';
+    const dueToday=current.filter(b=>status(b).key==='today').length;
+    const soon=current.filter(b=>{const remainingDays=(Date.parse(b.due+'T12:00:00Z')-Date.parse(today()+'T12:00:00Z'))/86400000;return remainingDays>=1&&remainingDays<=3&&status(b).key!=='paid';}).length;
+    const alert=$('#finance-alerts');alert.hidden=!isThisMonth||(!allLate.length&&!dueToday&&!soon);
+    if(!alert.hidden){
+      const parts=[];
+      if(allLate.length)parts.push(allLate.length+' atrasada'+(allLate.length>1?'s':''));
+      if(dueToday)parts.push(dueToday+' vencendo hoje');
+      if(soon)parts.push(soon+' nos próximos 3 dias');
+      alert.innerHTML='<strong>⚠️ Atenção:</strong> '+parts.join(' · ')+'. <button type="button" id="go-urgent">Ver contas</button>';
+    }
     $$('.finance-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===activeView));
     ['bills','calendar','recurring','reports'].forEach(view=>$('#view-'+view).hidden=view!==activeView);
     if(activeView==='bills')renderBills();
@@ -99,7 +113,10 @@
   function renderBills(){
     const term=$('#finance-search').value.trim().toLocaleLowerCase('pt-BR');
     const category=$('#finance-category-filter').value;
-    let list=items().filter(b=>{
+    const pool=filter==='overdue'&&range().from.slice(0,7)===today().slice(0,7)
+      ?Array.from(new Map(items().concat(historicalOverdue()).map(b=>[b.id,b])).values())
+      :items();
+    let list=pool.filter(b=>{
       const s=status(b);
       const matches=!term||(b.title+' '+b.payee+' '+b.category+' '+b.notes).toLocaleLowerCase('pt-BR').includes(term);
       return matches&&(category==='all'||b.category===category)&&(
@@ -116,6 +133,7 @@
     const weekdays=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
     const offset=(new Date(r.year,r.month,1).getDay()+6)%7;
     const days=Number(r.to.slice(-2));
+    if(selectedDay===null||selectedDay>days)selectedDay=Math.min(Number(today().slice(-2)),days);
     let html=weekdays.map(d=>'<div class="finance-day-heading">'+d+'</div>').join('');
     for(let j=0;j<offset;j++)html+='<button class="empty" type="button" disabled aria-hidden="true"></button>';
     for(let day=1;day<=days;day++){
@@ -123,7 +141,6 @@
       html+='<button type="button" data-day="'+day+'" class="'+(bills.length?'has-bills ':'')+(sel?'selected':'')+'"><span class="day-number">'+day+'</span><span class="day-amount">'+(bills.length?bills.length+' conta'+(bills.length>1?'s':'')+' · '+esc(E.asBRL(total)):'')+'</span></button>';
     }
     $('#finance-calendar').innerHTML=html;
-    if(selectedDay===null||selectedDay>days)selectedDay=Math.min(Number(today().slice(-2)),days);
     const bills=daily.get(selectedDay)||[];
     $('#finance-calendar-day').innerHTML='<h3>Dia '+selectedDay+' · '+bills.length+' conta'+(bills.length===1?'':'s')+'</h3>'+(bills.length?bills.map(card).join(''):'<p>Não há contas com vencimento neste dia.</p>');
   }
@@ -341,7 +358,7 @@
     const b=e.target.closest('button');if(!b)return;
     if(b.id==='finance-empty-add'){openNew();return;}
     if(b.id==='finance-recurring-empty'){openNew(true);return;}
-    if(b.id==='go-urgent'){activeView='bills';filter='pending';render();$$('.finance-status-tabs button').forEach(el=>el.classList.toggle('active',el.dataset.filter===filter));return;}
+    if(b.id==='go-urgent'){activeView='bills';filter='overdue';render();$$('.finance-status-tabs button').forEach(el=>el.classList.toggle('active',el.dataset.filter===filter));return;}
     if(b.hasAttribute('data-details')){showDetails(lookup(b.dataset.details));return;}
     if(b.hasAttribute('data-edit')){editBill(lookup(b.dataset.edit));return;}
     if(b.hasAttribute('data-pay')){openPayment(lookup(b.dataset.pay));return;}
