@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#e43b3b">
+<meta name="description" content="Organize as contas da Quentinha da Guerreira com poucos toques.">
+<title>Contas a pagar - Quentinha da Guerreira</title>
+<link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./finance.css">
+<script defer src="./config.js"></script><script defer src="./finance-engine.js"></script><script defer src="./cloud.js"></script><script defer src="./finance.js"></script>
+</head>
+<body>
+<section id="finance-login" class="login-screen" hidden>
+  <aside class="login-brand"><img src="./icon.svg" width="84" height="84" alt=""><p>QUENTINHA<br>DA <span>GUERREIRA.</span></p><small>Contas em dia, cozinha tranquila.</small></aside>
+  <div class="login-card"><img src="./icon.svg" width="64" height="64" alt="">
+    <p class="eyebrow">CONTAS A PAGAR</p><h1>Vamos organizar<br>as contas?</h1>
+    <p>Use o mesmo e-mail e senha do estoque.</p>
+    <form id="finance-login-form">
+      <label>E-mail<input type="email" name="email" autocomplete="username" required placeholder="Seu e-mail"></label>
+      <label>Senha<input type="password" name="password" autocomplete="current-password" required placeholder="Sua senha"></label>
+      <p class="error" id="finance-login-error" role="alert"></p>
+      <button class="primary wide" type="submit">Entrar <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="login-foot"><a href="./">Voltar ao estoque</a></p>
+  </div>
+</section>
+<div id="finance-dashboard" hidden>
+<header><div class="header-inner">
+  <a class="brand" href="./"><img src="./icon.svg" width="40" height="40" alt=""><span><small>QUENTINHA DA GUERREIRA</small><strong>Contas a pagar</strong></span></a>
+  <div class="header-right"><span id="finance-sync" role="status">Conectando…</span><button class="quiet" id="finance-logout">Sair</button></div>
+</div></header>
+<main class="finance-main">
+  <nav class="finance-nav" aria-label="Painéis"><a href="./">📦 Estoque</a><a class="active" href="./contas-a-pagar.html" aria-current="page">💳 Contas a pagar</a></nav>
+  <div class="finance-hero">
+    <div><p class="eyebrow">ORGANIZAÇÃO FINANCEIRA</p><h1>Minhas contas</h1><p>Veja o que precisa pagar e o que já foi pago.</p></div>
+    <button id="finance-add" class="primary finance-add">＋ Nova conta</button>
+  </div>
+  <div class="finance-month-bar" aria-label="Mês selecionado">
+    <button id="month-prev" class="month-arrow" aria-label="Mês anterior">‹</button>
+    <strong id="finance-month-name">—</strong>
+    <button id="month-next" class="month-arrow" aria-label="Próximo mês">›</button>
+    <button id="month-current" class="text-button">Ir para este mês</button>
+  </div>
+  <section class="finance-summary" aria-label="Resumo do mês">
+    <article class="finance-stat important"><span>Falta pagar</span><strong id="sum-remaining">R$ 0,00</strong><small id="sum-remaining-note">Contas pendentes do mês</small></article>
+    <article class="finance-stat positive"><span>Já pagou</span><strong id="sum-paid">R$ 0,00</strong><small>Pagamentos registrados</small></article>
+    <article class="finance-stat urgent"><span>Em atraso</span><strong id="sum-overdue">R$ 0,00</strong><small id="sum-overdue-note">Neste mês</small></article>
+    <article class="finance-stat"><span>Contas pendentes</span><strong id="sum-open">0</strong><small id="sum-unknown">Aguardando pagamento</small></article>
+  </section>
+  <div class="finance-progress"><div class="finance-progress-line"><strong>Contas do mês</strong><span id="progress-label">0% quitado</span></div><div class="finance-progress-track"><span id="progress-fill"></span></div></div>
+  <div id="finance-alerts" role="status" class="finance-alerts" hidden></div>
+  <nav class="finance-tabs" aria-label="Visualização das contas">
+    <button class="active" data-view="bills">📋 Contas</button><button data-view="calendar">📅 Calendário</button>
+    <button data-view="recurring">🔁 Fixas e parcelas</button><button data-view="reports">📊 Resumo</button>
+  </nav>
+  <section id="view-bills">
+    <div class="finance-filters">
+      <label class="finance-search"><span class="sr-only">Buscar conta</span><input id="finance-search" type="search" placeholder="⌕ Buscar conta ou fornecedor"></label>
+      <label class="sr-only" for="finance-category-filter">Categoria</label><select id="finance-category-filter"><option value="all">Todas as categorias</option></select>
+    </div>
+    <div class="finance-status-tabs" role="group" aria-label="Situação">
+      <button data-filter="all" class="active">Todas</button><button data-filter="pending">A pagar</button><button data-filter="overdue">Atrasadas</button><button data-filter="paid">Pagas</button>
+    </div>
+    <p class="finance-count" id="finance-result-count"></p>
+    <div id="finance-bills-list" class="finance-bills-list"></div>
+  </section>
+  <section id="view-calendar" hidden><div class="section-title"><div><h2>Calendário do mês</h2><p>Toque em um dia para ver as contas que vencem nele.</p></div></div><div class="finance-calendar" id="finance-calendar"></div><div id="finance-calendar-day"></div></section>
+  <section id="view-recurring" hidden><div class="section-title"><div><h2>Contas fixas e parceladas</h2><p>Cadastre uma vez e os próximos vencimentos aparecem automaticamente.</p></div><button id="finance-add-recurring" class="secondary">＋ Nova conta fixa</button></div><div id="finance-recurring-list"></div></section>
+  <section id="view-reports" hidden>
+    <div class="section-title"><div><h2>Resumo financeiro</h2><p>Entenda para onde está indo o dinheiro.</p></div></div>
+    <div class="finance-report-actions"><button id="finance-copy" class="secondary">Copiar resumo para WhatsApp</button><button id="finance-export" class="secondary">↓ Baixar CSV</button><button id="finance-print" class="secondary">Imprimir / salvar PDF</button></div>
+    <h2 class="finance-small-heading">Despesas por categoria</h2><div id="finance-categories-chart"></div>
+    <h2 class="finance-small-heading">Comparação com o mês anterior</h2><div id="finance-comparison"></div>
+    <p class="finance-disclaimer">Este painel mostra contas e pagamentos. Compras já lançadas no estoque não são somadas automaticamente aqui, para não contar o mesmo gasto duas vezes.</p>
+  </section>
+  <footer>QUENTINHA DA GUERREIRA <span>Suas contas são sincronizadas entre os aparelhos autorizados.</span></footer>
+</main></div>
+<dialog id="finance-bill-dialog" class="finance-dialog"><form id="finance-bill-form">
+  <div class="dialog-heading"><div><p class="eyebrow">CONTAS A PAGAR</p><h2 id="finance-form-heading">Nova conta</h2></div><button class="close" type="button" data-finance-close="finance-bill-dialog" aria-label="Fechar">×</button></div>
+  <label>Nome da conta <input name="title" required maxlength="100" placeholder="Ex.: Luz, gás, fornecedor…" autocomplete="off"></label>
+  <div class="form-row"><label>Valor (R$) <input name="amount" inputmode="decimal" placeholder="Ex.: 150,00" autocomplete="off"></label><label>Vencimento <input name="due" type="date" required></label></div>
+  <p class="form-help">Não sabe o valor ainda? Deixe em branco e preencha depois.</p>
+  <div id="finance-repeat-wrapper"><label>Quando se repete? <select name="frequency"><option value="once">Só esta vez</option><option value="monthly">Todo mês</option><option value="weekly">Toda semana</option><option value="biweekly">A cada 15 dias</option><option value="yearly">Todo ano</option><option value="installments">Compra parcelada</option></select></label>
+    <div id="finance-installments" hidden><label>Quantas parcelas? <input name="count" type="number" min="2" max="120" step="1" value="2"></label><p class="form-help">Informe o valor de CADA parcela acima. Ex.: 6 parcelas de R$ 100,00.</p></div>
+  </div>
+  <details class="finance-more"><summary>Mais opções (se quiser)</summary>
+    <label>Categoria <select name="category" id="finance-form-category"></select></label>
+    <label>Fornecedor / para quem vai pagar <input name="payee" maxlength="100" placeholder="Opcional"></label>
+    <label>Como pretende pagar? <select name="method"><option value="">Ainda não sei</option><option>Pix</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option><option>Transferência</option><option>Outro</option></select></label>
+    <label>Observação <input name="notes" maxlength="500" placeholder="Opcional"></label>
+  </details>
+  <p id="finance-form-error" class="error" role="alert"></p>
+  <div class="dialog-actions"><button class="secondary" type="button" data-finance-close="finance-bill-dialog">Cancelar</button><button class="primary" type="submit" id="finance-save">Salvar conta</button></div>
+</form></dialog>
+<dialog id="finance-payment-dialog" class="finance-dialog"><form id="finance-payment-form">
+  <div class="dialog-heading"><div><p class="eyebrow">REGISTRAR PAGAMENTO</p><h2 id="payment-name">Marcar como paga</h2></div><button class="close" type="button" data-finance-close="finance-payment-dialog" aria-label="Fechar">×</button></div>
+  <p id="payment-remaining" class="finance-payment-hint"></p>
+  <label>Quanto foi pago? (R$) <input name="amount" inputmode="decimal" placeholder="Ex.: 150,00" required></label>
+  <div class="form-row"><label>Data do pagamento <input name="paidAt" type="date" required></label><label>Como pagou? <select name="method"><option>Pix</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option><option>Transferência</option><option>Outro</option></select></label></div>
+  <details class="finance-more"><summary>Adicionar observação</summary><label>Observação <input name="notes" maxlength="500" placeholder="Ex.: Paguei com desconto"></label></details>
+  <p id="finance-payment-error" class="error" role="alert"></p><div class="dialog-actions"><button class="secondary" type="button" data-finance-close="finance-payment-dialog">Cancelar</button><button class="primary" type="submit">Confirmar pagamento</button></div>
+</form></dialog>
+<dialog id="finance-details-dialog" class="finance-dialog"><div class="dialog-heading"><div><p class="eyebrow">DETALHES DA CONTA</p><h2 id="finance-details-title"></h2></div><button class="close" type="button" data-finance-close="finance-details-dialog" aria-label="Fechar">×</button></div><div id="finance-details-body"></div><div class="dialog-actions"><button class="secondary" type="button" data-finance-close="finance-details-dialog">Fechar</button><button class="primary" type="button" id="finance-edit-selected">Editar conta</button></div></dialog>
+<div id="finance-toast" class="toast" hidden role="status"></div>
+</body></html>
