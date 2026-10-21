@@ -98,6 +98,7 @@
     switch(action.type){
       case 'save-bill':
         validateBill(b);
+        if(b.amountCents!==null&&paidCents(state,b.id)>b.amountCents)throw new Error('O valor não pode ser menor que o total já pago. Desfaça o pagamento incorreto primeiro.');
         if(state.bills[b.id]?.archived)throw new Error('Esta conta foi cancelada.');
         state.bills[b.id]=b;break;
       case 'save-template':
