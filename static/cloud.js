@@ -20,7 +20,7 @@ window.CloudStock=(()=>{
   // Contas a pagar ficam em /finance, fora dos dados e transações do estoque.
   async function financeRequest(options={}){
     const s=await session();
-    const url=firebase.databaseURL.replace(/\\/$/,'')+'/finance.json?auth='+encodeURIComponent(s.idToken);
+    const url=firebase.databaseURL.replace(/[/]$/,'')+'/finance.json?auth='+encodeURIComponent(s.idToken);
     const result=await http(url,options);
     if(!result.response.ok&&result.response.status!==412){
       const error=new Error(result.response.status===403?'Sem permissão para as contas. Publique as regras atualizadas do Firebase.':'Não foi possível sincronizar as contas. Confira sua conexão.');
